@@ -88,7 +88,7 @@ PRUNED_MODEL_PATH=$proj_dir/$task/$ex_cate/${task}_${suffix}
 bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi None [DISTILLATION_PATH] 0.7 0.3 [PRUNED_MODEL_PATH] 3e-5
 ```
 
-The training process will save the model with the best validation accuracy under $PRUNED_MODEL_PATH/best. And you can use the `evalution.py` script for evaluation.
+The training process will save the model with the best validation accuracy under `$PRUNED_MODEL_PATH/best`. And you can use the `evalution.py` script for evaluation.
 
 
 ### Evaluation

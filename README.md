@@ -77,12 +77,12 @@ After pruning the model, the same script could be used for further fine-tuning t
 Note that during fine-tuning stage, `pruning_type` should be set to `None`.
 
 An example for training (pruning) is as follows:
-```shell
+```bash
 bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi structured_head+structured_mlp+hidden+layer [DISTILLATION_PATH] 0.7 0.3
 ```
 
 An example for fine_tuning after pruning is as follows:
-```shell
+```bash
 PRUNED_MODEL_PATH=$proj_dir/$task/$ex_cate/${task}_${suffix}
 bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi None [DISTILLATION_PATH] 0.7 0.3 [PRUNED_MODEL_PATH] 3e-5
 ```
@@ -94,13 +94,13 @@ The training process will save the model with the best validation accuracy under
 
 Our pruned models are served on Huggingface's model hub. You can use the script `evalution.py` to get the sparsity, inference time and development set results of a pruned model.
 
-```shell
+```bash
 python evaluation.py [TASK] [MODEL_NAME_OR_DIR]
 ```
 
 An example use of evaluating a sentence classification model is as follows:
 
-```shell
+```bash
 python evaluation.py MNLI princeton-nlp/CoFi-MNLI-s95 
 ```  
 

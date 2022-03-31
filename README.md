@@ -19,6 +19,10 @@ We propose CoFiPruning, a task-specific, structured pruning approach (**Co**arse
 
 ![](figures/main_figure.png)
 
+## Main Results
+We show the main results of CoFiPruning along with results of popular pruning and distillation methods including Block Pruning, DynaBERT, DistilBERT and TinyBERT. 
+![](figures/main_results.png)
+
 ## Model List
 
 Our released models are listed as following. You can download these models with the following links. We use a batch size of 128 and V100 32GB GPUs for speedup evaluation. We show F1 score for SQuAD and accuracy score for GLUE datasets. `s60` denotes that the sparsity of the model is roughly 60%.

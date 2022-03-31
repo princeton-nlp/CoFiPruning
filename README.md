@@ -21,6 +21,7 @@ We propose CoFiPruning, a task-specific, structured pruning approach (**Co**arse
 
 ## Main Results
 We show the main results of CoFiPruning along with results of popular pruning and distillation methods including Block Pruning, DynaBERT, DistilBERT and TinyBERT. 
+
 ![](figures/main_results.png)
 
 ## Model List

@@ -131,6 +131,10 @@ We use the following hyperparamters for training CoFiPruning:
 
 GLUE (small) denotes the GLUE tasks with a relatively smaller size including CoLA, STS-B, MRPC and RTE and GLUE (large) denotes the rest of the GLUE tasks including SST-2, MNLI, QQP and QNLI.
 
+
+## Bugs or Questions?
+If you have any questions related to the code or the paper, feel free to email Mengzhou (mengzhou@cs.princeton.edu) and Zexuan (zzhong@mails.tsinghua.edu.cn). If you encounter any problems when using the code, or want to report a bug, you can open an issue. Please try to specify the problem with details so we can help you better and quicker!
+
 ## Citation
 
 Please cite our paper if you use CoFiPruning in your work:

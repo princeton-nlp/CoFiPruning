@@ -1,10 +1,9 @@
 ## ☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models
 
-This repository contains the code and pruned models for our paper [Structured Pruning Learns Compact and Accurate Models](https://github.com/princeton-nlp/CoFiPruning).
+This repository contains the code and pruned models for our ACL'22 paper [Structured Pruning Learns Compact and Accurate Models](https://github.com/princeton-nlp/CoFiPruning).
 
 ## Quick Links
 
-- [☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models](#-cofipruning-structured-pruning-learns-compact-and-accurate-models)
 - [Quick Links](#quick-links)
 - [Overview](#overview)
 - [Model List](#model-list)
@@ -16,13 +15,13 @@ This repository contains the code and pruned models for our paper [Structured Pr
 
 ## Overview
 
-We propose a CoFiPruning, a task-specific, structured pruning approach (**Co**arse and **Fi**ne-grained Pruning) and show that structured pruning can achieve highly compact subnetworks and obtain large speedups and competitive accuracy as distillation approaches, while requiring much less computation. Our key insight is to jointly prune coarse-grained units (e.g., self-attention or feed-forward layers) and fine-grained units (e.g., heads, hidden dimensions) simultaneously. Different from existing works, our approach controls the pruning decision of every single parameter by multiple masks of different granularity. This is the key to large compression, as it allows the greatest flexibility of pruned structures and eases the optimization compared to only pruning small units.
+We propose CoFiPruning, a task-specific, structured pruning approach (**Co**arse and **Fi**ne-grained Pruning) and show that structured pruning can achieve highly compact subnetworks and obtain large speedups and competitive accuracy as distillation approaches, while requiring much less computation. Our key insight is to jointly prune coarse-grained units (e.g., self-attention or feed-forward layers) and fine-grained units (e.g., heads, hidden dimensions) simultaneously. Different from existing works, our approach controls the pruning decision of every single parameter by multiple masks of different granularity. This is the key to large compression, as it allows the greatest flexibility of pruned structures and eases the optimization compared to only pruning small units.
 
 ![](figures/main_figure.png)
 
 ## Model List
 
-Our released models are listed as following. You can download these models with the following links. We use a batch size of 128 and V100 32GB GPUs for speedup evaluation. We show F1 score for SQuAD and accuracy score for GLUE datasets.
+Our released models are listed as following. You can download these models with the following links. We use a batch size of 128 and V100 32GB GPUs for speedup evaluation. We show F1 score for SQuAD and accuracy score for GLUE datasets. `s60` denotes that the sparsity of the 
 |  model name | task | sparsity | speedup | score |  
 |:------|:--------:|:--------:|:-------:|:-----:|
 |  [princeton-nlp/CoFi-MNLI-s60](https://huggingface.co/princeton-nlp/CoFi-MNLI-s60) | MNLI |  60.2% | 2.1 ×| 85.3 |  
@@ -78,30 +77,30 @@ After pruning the model, the same script could be used for further fine-tuning t
 Note that during fine-tuning stage, `pruning_type` should be set to `None`.
 
 An example for training (pruning) is as follows:
-```bash
+```console
 bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi structured_head+structured_mlp+hidden+layer [DISTILLATION_PATH] 0.7 0.3
 ```
 
 An example for fine_tuning after pruning is as follows:
-```bash
+```console
 PRUNED_MODEL_PATH=$proj_dir/$task/$ex_cate/${task}_${suffix}
 bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi None [DISTILLATION_PATH] 0.7 0.3 [PRUNED_MODEL_PATH] 3e-5
 ```
 
-The training process will save the model with the best validation accuracy under `$PRUNED_MODEL_PATH/best`. And you can use the `evalution.py` script for evaluation.
+The training process will save the model with the best validation accuracy under `$PRUNED_MODEL_PATH/best`. And you can use the `evaluation.py` script for evaluation.
 
 
 ### Evaluation
 
 Our pruned models are served on Huggingface's model hub. You can use the script `evalution.py` to get the sparsity, inference time and development set results of a pruned model.
 
-```bash
+```console
 python evaluation.py [TASK] [MODEL_NAME_OR_DIR]
 ```
 
 An example use of evaluating a sentence classification model is as follows:
 
-```bash
+```console
 python evaluation.py MNLI princeton-nlp/CoFi-MNLI-s95 
 ```  
 
@@ -127,6 +126,10 @@ We use the following hyperparamters for training CoFiPruning:
 | Fine-tuning learning rate |     1e-5, 2e-5, 3e-5      |1e-5, 2e-5, 3e-5|1e-5, 2e-5, 3e-5|
 | Layer distill. alpha | 0.9, 0.7, 0.5|0.9, 0.7, 0.5|0.9, 0.7, 0.5|
 | Cross entropy distill. alpha | 0.1, 0.3, 0.5|0.1, 0.3, 0.5|0.1, 0.3, 0.5|
+| Pruning epochs | 100 | 20 | 20 |
+| Finetuning epochs | 20 | 20 | 20 |
+
+GLUE (small) denotes the GLUE tasks with a relatively smaller size including CoLA, STS-B, MRPC and RTE and GLUE (large) denotes the rest of the GLUE tasks including SST-2, MNLI, QQP and QNLI.
 
 ## Citation
 

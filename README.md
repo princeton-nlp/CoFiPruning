@@ -1,11 +1,9 @@
 ## ☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models
 
-This repository contains the code and pruned models for our ACL'22 paper [Structured Pruning Learns Compact and Accurate Models](https://github.com/princeton-nlp/CoFiPruning).
+This repository contains the code and pruned models for our ACL'22 paper [Structured Pruning Learns Compact and Accurate Models](https://arxiv.org/pdf/2204.00408.pdf).
 
 ## Quick Links
 
-- [☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models](#-cofipruning-structured-pruning-learns-compact-and-accurate-models)
-- [Quick Links](#quick-links)
 - [Overview](#overview)
 - [Main Results](#main-results)
 - [Model List](#model-list)
@@ -23,7 +21,7 @@ We propose CoFiPruning, a task-specific, structured pruning approach (**Co**arse
 ![](figures/main_figure.png)
 
 ## Main Results
-We show the main results of CoFiPruning along with results of popular pruning and distillation methods including Block Pruning, DynaBERT, DistilBERT and TinyBERT. 
+We show the main results of CoFiPruning along with results of popular pruning and distillation methods including Block Pruning, DynaBERT, DistilBERT and TinyBERT. Please see more detailed results in our paper. 
 
 ![](figures/main_results.png)
 
@@ -151,7 +149,7 @@ Please cite our paper if you use CoFiPruning in your work:
 @inproceedings{xia2022cofi,
    title={Structured Pruning Learns Compact and Accurate Models},
    author={Xia, Mengzhou and Zhong, Zexuan and Chen, Danqi},
-   booktitle={60th Annual Meeting of the Association for Computational Linguistics (ACL)},
+   booktitle={Association for Computational Linguistics (ACL)},
    year={2022}
 }
 ```

@@ -35,7 +35,7 @@ def load_model(model_path, model_class, zs=None, num_labels=2):
         model = load_model_with_zs(model_path, model_class, zs)
     else:
         # only and task name and model weights are accessible 
-        model = load_pruned_model(model_path, model_class, num_labels=num_labels)
+        model = load_pruned_model(model_path, model_class)
         print(f"Model Size: {calculate_parameters(model)}")
     return model
 
@@ -282,7 +282,7 @@ def load_pruned_model(model, weights):
     zs["mlp_z"] = mlp_z
     
     prune_model_with_z(zs, model)    
-    model.load_state_dict(weights)
+    model.load_state_dict(weights, strict=False)
     return model
 
 def get_full_model_size(model_class, model_name):

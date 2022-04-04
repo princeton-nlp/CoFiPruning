@@ -88,11 +88,7 @@ def main():
     log_all_parameters(logger, model_args, data_args,
                        training_args, additional_args)
 
-    try:
-        num_labels = glue_tasks_num_labels[data_args.task_name]
-        output_mode = glue_output_modes[data_args.task_name]
-    except KeyError:
-        raise ValueError("Task not found: %s" % (data_args.task_name))
+    
     
     if data_args.task_name is not None:
         # Downloading and loading a dataset from the hub.
@@ -190,6 +186,8 @@ def main():
         )
         teacher_model.eval()
 
+    config.do_layer_distill = additional_args.do_layer_distill
+
     model = Model.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -207,6 +205,7 @@ def main():
     logger.info(f"Model size: {calculate_parameters(model)}")
 
     zs = None
+    
     if additional_args.pretrained_pruned_model is not None:
         zs = load_zs(additional_args.pretrained_pruned_model)
 

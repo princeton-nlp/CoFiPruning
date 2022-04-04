@@ -35,8 +35,8 @@ logger = logging.get_logger(__name__)
 glue_tasks = {"cola": "mcc",
               "mnli": "mnli/acc",
               "mrpc": "acc",
-              "sst-2": "acc",
-              "sts-b": "corr",
+              "sst2": "acc",
+              "stsb": "corr",
               "qqp": "acc",
               "qnli": "acc",
               "rte": "acc"}
@@ -147,17 +147,16 @@ class CoFiTrainer(Trainer):
                                                  self.args.adam_beta2),
                                           eps=self.args.adam_epsilon, )
 
-                if self.additional_args.lagrangian_prune:
-                    lagrangian_params = [{
-                        "params": [p for n, p in self.l0_module.named_parameters() if "lambda" in n],
-                        "weight_decay": 0.0,
-                        "lr": -self.additional_args.reg_learning_rate
-                    }]
-                    log_params(lagrangian_params, "l0 reg lagrangian params")
-                    self.lagrangian_optimizer = AdamW(lagrangian_params,
-                                                      betas=(self.args.adam_beta1,
-                                                             self.args.adam_beta2),
-                                                      eps=self.args.adam_epsilon)
+                lagrangian_params = [{
+                    "params": [p for n, p in self.l0_module.named_parameters() if "lambda" in n],
+                    "weight_decay": 0.0,
+                    "lr": -self.additional_args.reg_learning_rate
+                }]
+                log_params(lagrangian_params, "l0 reg lagrangian params")
+                self.lagrangian_optimizer = AdamW(lagrangian_params,
+                                                    betas=(self.args.adam_beta1,
+                                                            self.args.adam_beta2),
+                                                    eps=self.args.adam_epsilon)
 
         if self.lr_scheduler is None:
             if self.additional_args.scheduler_type == "linear":
@@ -575,6 +574,7 @@ class CoFiTrainer(Trainer):
                 if head_layer_z is not None:
                     existing_layers = head_layer_z != 0
 
+                layer_loss = 0
                 # no ordering restriction specified
                 if self.additional_args.layer_distill_version == 3:
                     alignment = torch.argmin(layerwiseloss, dim=1)

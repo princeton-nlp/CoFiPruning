@@ -16,7 +16,8 @@ def log_all_parameters(logger, model_args, data_args, training_args, additional_
         logger.info(f"{arg} = {getattr(additional_args, arg)}")
 
 def calculate_parameters(module):
-    return sum(p.numel() for n, p in module.named_parameters() if "embedding" not in n)
+    keys = ["embedding", "layer_transformation", "classifier", "pooler"]
+    return sum(p.numel() for n, p in module.named_parameters() if not any(key in n for key in keys))
 
 
 def calculate_model_size_from_z(full_model_size, **kwargs):

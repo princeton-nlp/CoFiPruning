@@ -33,7 +33,7 @@ seed=57
 ex_name_suffix=$2
 ex_name=${task_name}_${ex_name_suffix}
 ex_cate=$3
-output_dir=$out/space2/out/${task_name}/${ex_cate}/${ex_name}
+output_dir=${proj_dir}/out/${task_name}/${ex_cate}/${ex_name}
 
 # pruning and distillation
 pruning_type=$4
@@ -41,6 +41,7 @@ target_sparsity=$5
 distillation_path=$6
 distill_loss_alpha=$7
 distill_ce_loss_alpha=$8
+distill_temp=2
 # 2: fix hidden layers, 3: min distance matching without restriction, 4: mix distance matching with restriction
 layer_distill_version=3 
 prepruning_finetune_epochs=1
@@ -61,6 +62,8 @@ fi
 
 seed=9
 
+pretrained_pruned_model=None
+
 # FT after pruning
 if [[ $pruning_type == None ]]; then
   pretrained_pruned_model=${10}
@@ -75,7 +78,6 @@ python3 $code_dir/run_glue_prune.py \
 	   --output_dir ${output_dir} \
 	   --logging_steps ${logging_steps} \
 	   --task_name ${task_name} \
-	   --data_dir ${data_dir} \
 	   --model_name_or_path ${model_name_or_path} \
 	   --ex_name ${ex_name} \
 	   --do_train \
@@ -92,14 +94,14 @@ python3 $code_dir/run_glue_prune.py \
 	   --evaluation_strategy steps \
 	   --seed ${seed} \
 	   --pruning_type ${pruning_type} \
-       --pretrained_pruned_model ${pretrained_pruned_model} \
-       --target_sparsity $target_sparsity \
-       --freeze_embeddings \
-       --do_distill \
-       --do_layer_distill \
-       --distillation_path $distillation_path \
-       --distill_ce_loss_alpha $distill_ce_loss_alpha \
-       --distill_loss_alpha $distill_loss_alpha \
-       --distill_temp $distill_temp \
-       --scheduler_type $scheduler_type \
-       --layer_distill_version $layer_distill_version
+     --pretrained_pruned_model ${pretrained_pruned_model} \
+     --target_sparsity $target_sparsity \
+     --freeze_embeddings \
+     --do_distill \
+     --do_layer_distill \
+     --distillation_path $distillation_path \
+     --distill_ce_loss_alpha $distill_ce_loss_alpha \
+     --distill_loss_alpha $distill_loss_alpha \
+     --distill_temp $distill_temp \
+     --scheduler_type $scheduler_type \
+     --layer_distill_version $layer_distill_version

@@ -1,7 +1,7 @@
 import pdb
 
-import logging
 from re import L
+from black import main
 import torch
 import math
 import numpy as np
@@ -9,9 +9,10 @@ import torch.nn.functional as F
 from torch.nn.modules import Module
 from torch.nn.parameter import Parameter
 from torch.autograd import Variable
+from transformers.utils import logging
 
 limit_a, limit_b, epsilon = -.1, 1.1, 1e-6
-logger = logging.getLogger(__name__)
+logger = logging.get_logger(__name__)
 
 class L0Module(Module):
     def __init__(self,
@@ -33,25 +34,25 @@ class L0Module(Module):
         self.num_attention_heads = config.num_attention_heads
         self.mlp_num_per_layer = 1
         self.dim_per_head = self.hidden_size // self.num_attention_heads 
-        self.num_hidden_layers = self.num_hidden_layers
+        self.num_hidden_layers = config.num_hidden_layers
         self.vocab_size = config.vocab_size
 
         self.params_per_head_layer = self.hidden_size * self.hidden_size * 4 + self.hidden_size * 4
         self.params_per_head =  self.params_per_head_layer // self.num_attention_heads
         
-        # we ignore the parameters in normalization layers
+
+        self.params_per_mlp_layer = self.hidden_size * self.intermediate_size * 2 + self.hidden_size + self.hidden_size * 4
+        self.params_per_intermediate_dim = self.params_per_mlp_layer // self.intermediate_size
+
+        # we ignore the parameters in normalization layers (it takes a very small amount)
         self.full_model_size = (self.params_per_head_layer + self.params_per_mlp_layer) * self.num_hidden_layers
         self.prunable_model_size = 0 
-
-        self.params_per_mlp_layer = self.hidden_size * self.intermediate_size + self.hidden_size + self.hidden_size * 4
-        self.params_per_intermediate_dim = self.params_per_mlp_layer // self.intermediate_size
 
         self.temperature = temperature
         self.droprate_init = droprate_init if droprate_init != 0. else 0.5
         
         self.types = []
         self.z_logas = {}
-        self.lambas = {}
         self.parameters_per_dim = {}
         self.sizes = {}
         self.shapes = {}
@@ -87,7 +88,7 @@ class L0Module(Module):
 
     def initialize_one_module(self, module_name):
         if module_name == "structured_mlp":
-            module_name.initialize_structured_mlp()
+            self.initialize_structured_mlp()
         elif module_name == "structured_heads":
             self.initialize_structured_head()
         elif module_name == "hidden":
@@ -96,10 +97,9 @@ class L0Module(Module):
             self.initialize_whole_mlp()
             self.initialized_layer_structured_heads()
             
-    def add_one_module(self, z_loga, type, lamba, parameter_per_dim, size, shape):
+    def add_one_module(self, z_loga, type, parameter_per_dim, size, shape):
         self.types.append(type)
         self.z_logas[type] = z_loga
-        self.lambas[type] = lamba
         self.parameters_per_dim[type] = parameter_per_dim
         self.sizes[type] = size
         self.shapes[type] = shape
@@ -112,47 +112,47 @@ class L0Module(Module):
 
     def initialize_hidden(self):
         self.hidden_loga = self.initialize_parameters(self.hidden_size)
-        self.add_one_module(self.hidden_loga, type="hidden", lamba=self.hidden_lamba,
+        self.add_one_module(self.hidden_loga, type="hidden", 
                             parameter_per_dim=self.hidden_size * 4 + self.hidden_size * 4 * 2,
                             size=self.hidden_size, shape=[self.hidden_size])
         self.reset_loga(self.hidden_loga, mean=10)
         logger.info(f"Initialized hidden loga! Prunable_model_size = {self.prunable_model_size}")
 
     def initialize_structured_head(self, add_prunable_model_size=True):
-        self.head_loga = self.initialize_parameters(self.head_num_per_layer[0], self.num_layer)
+        self.head_loga = self.initialize_parameters(self.num_attention_heads, self.num_hidden_layers)
         self.reset_loga(self.head_loga, mean=10)
-        self.add_one_module(self.head_loga, type="head", lamba=self.head_lamba,
-                            parameter_per_dim=self.parameter_per_head, size=self.head_num_per_layer[0],
-                            shape=[self.num_layer, 1, self.head_num_per_layer[0], 1, 1])
+        self.add_one_module(self.head_loga, type="head", 
+                            parameter_per_dim=self.params_per_head, size=self.num_attention_heads,
+                            shape=[self.num_hidden_layers, 1, self.num_attention_heads, 1, 1])
         if add_prunable_model_size:
-            self.prunable_model_size += self.parameter_per_head * self.num_layer * self.head_num_per_layer
+            self.prunable_model_size += self.params_per_head * self.num_hidden_layers * self.num_attention_heads
         logger.info(f"Initialized structured heads! Prunable_model_size = {self.prunable_model_size}")
 
     def initialized_layer_structured_heads(self):
-        n_layer = self.num_layer - len(self.fixed_layers)
+        n_layer = self.num_hidden_layers
         self.headlayer_loga = self.initialize_parameters(n_layer)
         self.reset_loga(self.headlayer_loga, mean=10)
-        self.add_one_module(self.headlayer_loga, type="head_layer", lamba=self.head_lamba,
-                            parameter_per_dim=self.parameter_per_head * self.head_num_per_layer, size=1,
+        self.add_one_module(self.headlayer_loga, type="head_layer", 
+                            parameter_per_dim=self.params_per_head * self.num_attention_heads, size=1,
                             shape=[n_layer])
         logger.info(f"Initialized layerwise structured heads! Prunable_model_size = {self.prunable_model_size}")
 
     def initialize_structured_mlp(self):
-        self.int_loga = self.initialize_parameters(self.intermediate_size[0], self.num_layer)
+        self.int_loga = self.initialize_parameters(self.intermediate_size, self.num_hidden_layers)
 
-        self.add_one_module(self.int_loga, type="intermediate", lamba=self.intermediate_lamba,
-                            parameter_per_dim=self.parameter_per_intermediate_dim, size=self.intermediate_size[0],
-                            shape=[self.num_layer, 1, 1, self.intermediate_size[0]])
-        self.prunable_model_size += self.params_per_mlp_layer * self.num_layer
+        self.add_one_module(self.int_loga, type="intermediate", 
+                            parameter_per_dim=self.params_per_intermediate_dim, size=self.intermediate_size,
+                            shape=[self.num_hidden_layers, 1, 1, self.intermediate_size])
+        self.prunable_model_size += self.params_per_mlp_layer * self.num_hidden_layers
         self.reset_loga(self.int_loga)
         logger.info(f"Initialized structured mlp! Prunable_model_size = {self.prunable_model_size}")
 
 
     def initialize_whole_mlp(self):
-        n_layer = self.num_layer - len(self.fixed_layers)
+        n_layer = self.num_hidden_layers
         self.intlayer_loga = self.initialize_parameters(n_layer)
-        self.add_one_module(self.intlayer_loga, type="mlp", lamba=self.intermediate_lamba,
-                            parameter_per_dim=self.parameter_per_mlp, size=self.mlp_num_per_layer[0],
+        self.add_one_module(self.intlayer_loga, type="mlp", 
+                            parameter_per_dim=self.params_per_mlp_layer, size=self.mlp_num_per_layer,
                             shape=[n_layer])
         self.reset_loga(self.intlayer_loga, mean=10)
         logger.info(f"Initialized whole mlps! Prunable_model_size = {self.prunable_model_size}")
@@ -263,9 +263,9 @@ class L0Module(Module):
     def lagrangian_regularization(self, pruned_steps):
         target_sparsity = self.target_sparsity
         if "hidden" in self.types:
-            expected_size, constraint = self.get_num_parameters_and_constraint_for_hidden(pruned_steps)
+            expected_size, constraint = self.get_num_parameters_and_constraint_for_hidden()
         else:
-            expected_size, constraint = self.get_num_parameters_and_constraint(pruned_steps)
+            expected_size, constraint = self.get_num_parameters_and_constraint()
         expected_sparsity = 1 - expected_size / self.prunable_model_size
         if self.lagrangian_warmup > 0:
             target_sparsity = self.get_target_sparsity(pruned_steps)
@@ -287,8 +287,6 @@ class L0Module(Module):
         eps = self.get_eps(torch.FloatTensor(*loga.shape)).to(loga.device)
         z = self.quantile_concrete(eps, loga)
         z = F.hardtanh(z, min_val=0, max_val=1)
-        if self.l0_binary_mask:
-            z[z.nonzero(as_tuple=True)] = 1
         return z
 
     # during inference
@@ -382,3 +380,8 @@ class L0Module(Module):
                 if type != "hidden_z":
                     zs[type] = torch.stack(zs[type])
         return zs 
+
+if __name__ == "__main__":
+    from transformers import AutoConfig
+    config = AutoConfig.from_pretrained("bert-base-uncased")
+    l0_module = L0Module(config, lagrangian_warmup=200, target_sparsity=0.5)

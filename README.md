@@ -4,13 +4,16 @@ This repository contains the code and pruned models for our ACL'22 paper [Struct
 
 ## Quick Links
 
+- [☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models](#-cofipruning-structured-pruning-learns-compact-and-accurate-models)
 - [Quick Links](#quick-links)
 - [Overview](#overview)
+- [Main Results](#main-results)
 - [Model List](#model-list)
 - [Train CoFiPruning](#train-cofipruning)
   - [Requirements](#requirements)
   - [Training](#training)
   - [Evaluation](#evaluation)
+- [Bugs or Questions?](#bugs-or-questions)
 - [Citation](#citation)
 
 ## Overview
@@ -83,7 +86,7 @@ Note that during fine-tuning stage, `pruning_type` should be set to `None`.
 
 An example for training (pruning) is as follows:
 ```bash
-bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi structured_head+structured_mlp+hidden+layer [DISTILLATION_PATH] 0.7 0.3
+bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi structured_head+structured_mlp+hidden+layer 0.95 [DISTILLATION_PATH] 0.7 0.3
 ```
 
 An example for fine_tuning after pruning is as follows:

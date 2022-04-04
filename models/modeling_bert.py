@@ -59,19 +59,37 @@ class CoFiBertForSequenceClassification(BertForSequenceClassification):
         if os.path.exists(pretrained_model_name_or_path):
             weights = torch.load(os.path.join(pretrained_model_name_or_path, "pytorch_model.bin"), map_location=torch.device("cpu"))
         else:
-            archive_file = hf_bucket_url(pretrained_model_name_or_path, "pytorch_model.bin") 
+            archive_file = hf_bucket_url(pretrained_model_name_or_path, filename="pytorch_model.bin") 
             resolved_archive_file = cached_path(archive_file)
             weights = torch.load(resolved_archive_file, map_location="cpu")
+        
+        # Convert old format to new format if needed from a PyTorch state_dict
+        old_keys = []
+        new_keys = []
+        for key in weights.keys():
+            new_key = None
+            if "gamma" in key:
+                new_key = key.replace("gamma", "weight")
+            if "beta" in key:
+                new_key = key.replace("beta", "bias")
+            if new_key:
+                old_keys.append(key)
+                new_keys.append(new_key)
+        for old_key, new_key in zip(old_keys, new_keys):
+            weights[new_key] = weights.pop(old_key)
         
         drop_weight_names = ["layer_transformation.weight", "layer_transformation.bias"]
         for name in drop_weight_names:
             if name in weights:
                 weights.pop(name)
 
-        config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
-        config.do_layer_distill = False
+        if "config" not in kwargs:
+            config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
+            config.do_layer_distill = False
+        else:
+            config = kwargs["config"]
+        
         model = cls(config)
-
         load_pruned_model(model, weights)
         return model
 
@@ -580,6 +598,21 @@ class CoFiBertForQuestionAnswering(BertForQuestionAnswering):
             archive_file = hf_bucket_url(pretrained_model_name_or_path, "pytorch_model.bin") 
             resolved_archive_file = cached_path(archive_file)
             weights = torch.load(resolved_archive_file, map_location="cpu")
+        
+        # Convert old format to new format if needed from a PyTorch state_dict
+        old_keys = []
+        new_keys = []
+        for key in weights.keys():
+            new_key = None
+            if "gamma" in key:
+                new_key = key.replace("gamma", "weight")
+            if "beta" in key:
+                new_key = key.replace("beta", "bias")
+            if new_key:
+                old_keys.append(key)
+                new_keys.append(new_key)
+        for old_key, new_key in zip(old_keys, new_keys):
+            weights[new_key] = weights.pop(old_key)
         
         drop_weight_names = ["layer_transformation.weight", "layer_transformation.bias"]
         for name in drop_weight_names:

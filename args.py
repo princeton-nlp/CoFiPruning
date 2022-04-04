@@ -1,4 +1,18 @@
 from dataclasses import dataclass, field
+from typing import Optional
+
+
+task_to_keys = {
+    "cola": ("sentence", None),
+    "mnli": ("premise", "hypothesis"),
+    "mrpc": ("sentence1", "sentence2"),
+    "qnli": ("question", "sentence"),
+    "qqp": ("question1", "question2"),
+    "rte": ("sentence1", "sentence2"),
+    "sst2": ("sentence", None),
+    "stsb": ("sentence1", "sentence2"),
+    "wnli": ("sentence1", "sentence2"),
+}
 
 @dataclass
 class AdditionalArguments():
@@ -30,6 +44,13 @@ class AdditionalArguments():
     layer_distill_version: int = field(default=1, metadata={"help": "1: add loss to each layer, 2: add loss to existing layers only"})
     distill_loss_alpha: float = field(default=0.9, metadata={"help": "Distillation loss weight"})
     distill_ce_loss_alpha: float = field(default=0.1, metadata={"help": "Distillation cross entrypy loss weight"})
+    distill_temp: float = field(default=2./3., metadata={"help": "Distillation temperature"})
+
+    def __post_init__(self):
+        if self.pretrained_pruned_model == "None":
+            self.pretrained_pruned_model = None
+
+        
 
 @dataclass
 class DataTrainingArguments:

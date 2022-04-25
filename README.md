@@ -67,8 +67,8 @@ We provide example training scripts for training with CoFiPruning with different
 - `--task_name`: we support sequence classification tasks and extractive question answer tasks. You can input a glue task name, e.g., `MNLI` or use `--train_file` and `--validation_file` arguments with other tasks (supported by HuggingFace).
 - `--ex_name_suffix`: experiment name (for output dir)
 - `--ex_cate`: experiment category name (for output dir)
-- `--pruning_type`: we support all combinations of the following four types of pruning units. Default pruning type is `structured_head+structured_mlp+hidden+layer`. Setting it to `None` falls back to standard fine-tuning.
-  - `structured_head`: head pruning
+- `--pruning_type`: we support all combinations of the following four types of pruning units. Default pruning type is `structured_heads+structured_mlp+hidden+layer`. Setting it to `None` falls back to standard fine-tuning.
+  - `structured_heads`: head pruning
   - `structured_mlp`: mlp intermediate dimension pruning
   - `hidden`: hidden states pruning
   - `layer`: layer pruning

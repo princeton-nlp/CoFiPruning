@@ -34,12 +34,12 @@ logger = logging.get_logger(__name__)
 
 glue_tasks = {"cola": "mcc",
               "mnli": "mnli/acc",
-              "mrpc": "acc",
-              "sst2": "acc",
+              "mrpc": "accuracy",
+              "sst2": "accuracy",
               "stsb": "corr",
-              "qqp": "acc",
-              "qnli": "acc",
-              "rte": "acc"}
+              "qqp": "accuracy",
+              "qnli": "accuracy",
+              "rte": "accuracy"}
 
 class Eval_Counter():
     def __init__(self):
@@ -471,14 +471,16 @@ class CoFiTrainer(Trainer):
 
         if zs is not None:
             lag_loss, expected_sparsity, target_sparsity = self.l0_module.lagrangian_regularization(
-                self.global_step - self.dditional_args.prepruning_finetune_steps)
+                self.global_step - self.prepruning_finetune_steps)
 
+            expected_sparsity = round(expected_sparsity.item(), 5)
             metrics.update(pruned_model_size_info)
             metrics["expected_sparsity"] = expected_sparsity
             metrics["target_sparsity"] = target_sparsity
 
-            if expected_sparsity >= self.additional_args.target_sparsity:
+            if (not self.start_saving_best) and (expected_sparsity >= self.additional_args.target_sparsity):
                 self.start_saving_best = True
+                logger.info(f"Starting saving the best from epoch {int(self.epoch)} and step {self.global_step}")
 
         self.model.config.output_hidden_states = True
         self.model.config.output_attentions = True
@@ -506,7 +508,9 @@ class CoFiTrainer(Trainer):
                 if na in output.metrics:
                     eval_score = output.metrics[na]
                     break
-
+        
+        logger.info(f"starting saving best: {self.global_step} {self.start_saving_best}")
+        
         if self.start_saving_best:
             best_so_far = self.eval_counter.update(
                 self.epoch, self.global_step, eval_score)
@@ -519,7 +523,7 @@ class CoFiTrainer(Trainer):
                 torch.save(zs, os.path.join(best_dir, "zs.pt"))
                 torch.save(self.l0_module, os.path.join(
                     best_dir, "l0_module.pt"))
-                logger.info(f"Saving the best model so far: [Epoch {self.epoch} | Step: {self.global_step} | Model size: {output.metrics['remaining_params'] if 'remaining_params' in output.metrics else 'Full' } | Score: {eval_score}]")
+                logger.info(f"Saving the best model so far: [Epoch {int(self.epoch)} | Step: {self.global_step} | Model size: {output.metrics['remaining_params'] if 'remaining_params' in output.metrics else 'Full' } | Score: {round(eval_score, 5)}]")
                 self.model.save_pretrained(best_dir)
 
         return output.metrics
@@ -606,7 +610,7 @@ class CoFiTrainer(Trainer):
                 layer_loss += layerwiseloss[layerwise, alignment].sum()
             return layer_loss
         else:
-            return 0
+            return None
 
     def calculate_distillation_loss(self, teacher_outputs, student_outputs, zs):
         layer_loss = self.calculate_layer_distillation_loss(teacher_outputs, student_outputs, zs)
@@ -619,8 +623,10 @@ class CoFiTrainer(Trainer):
                 teacher_outputs[1] / self.additional_args.distill_temp, dim=-1),
             reduction="batchmean") * (self.additional_args.distill_temp ** 2)
 
-        loss = self.additional_args.distill_loss_alpha * distill_loss + \
-            self.additional_args.distill_ce_loss_alpha * ce_distill_loss
+        loss = self.additional_args.distill_ce_loss_alpha * ce_distill_loss
+        if distill_loss is not None:
+            loss += self.additional_args.distill_loss_alpha * distill_loss
+            
 
         return distill_loss, ce_distill_loss, loss
 

@@ -1,4 +1,4 @@
-import numpys as np
+import numpy as np
 
 def log_all_parameters(logger, model_args, data_args, training_args, additional_args):
     logger.info("Model Arguments:")

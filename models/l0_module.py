@@ -310,21 +310,20 @@ class L0Module(Module):
     def get_z_from_zs(self, zs):
         numpified_zs = {} 
         for type in self.all_types:
-            name = z.split("_")[0]
+            name = type[:-2]
             z = zs.get(type, np.ones(self.shapes[name]))
             if torch.is_tensor(z): 
-                new_z = z.squeeze().cpu().numpy() > 0
-            numpified_zs[type] = new_z
+                new_z = z.squeeze().detach().cpu().numpy() > 0
+            numpified_zs[name] = new_z
         return numpified_zs
 
     def calculate_model_size(self, zs):
         numpified_zs = self.get_z_from_zs(zs)
-        
         hidden_z = numpified_zs["hidden"]
         intermediate_z = numpified_zs["intermediate"]
-        mlp_z = numpified_zs["mlp"]
+        mlp_z = numpified_zs["mlp"].reshape(-1, 1)
         head_z = numpified_zs["head"]
-        head_layer_z = numpified_zs["head_layer"]
+        head_layer_z = numpified_zs["head_layer"].reshape(-1, 1)
 
         remaining_hidden_dims = hidden_z.sum().item()
         remaining_intermediate_nums = intermediate_z.reshape(self.num_hidden_layers, self.intermediate_size).sum(-1).tolist()
@@ -333,19 +332,21 @@ class L0Module(Module):
         head_nums = np.outer((head_z * head_layer_z).reshape(-1), hidden_z).sum().item()
         intermediate_nums = np.outer((intermediate_z * mlp_z).reshape(-1), hidden_z).sum().item()
 
-        remaining_model_size = head_nums * self.params_per_head_layer + intermediate_nums * self.params_per_head
+        remaining_model_size = head_nums * self.dim_per_head * 4 + intermediate_nums * 2
         pruned_model_size = self.prunable_model_size - remaining_model_size
 
         results = {}
         # Not multiplied with each other
-        results["head_layers"] = head_layer_z
-        results["mlp_layers"] = mlp_z
+        results["head_layers"] = head_layer_z.reshape(-1).astype(int).tolist()
+        results["mlp_layers"] = mlp_z.reshape(-1).astype(int).tolist()
         results["hidden_dims"] = remaining_hidden_dims
         results["intermediate_dims"] = remaining_intermediate_nums
         results["head_nums"] = remaining_head_nums
         results["pruned_params"] = pruned_model_size
         results["remaining_params"] = remaining_model_size
         results["pruned_model_sparsity"] = pruned_model_size / self.prunable_model_size
+
+        return results
 
         # logger.info(f"remaining_head_layers: {head_layer_z}")
         # logger.info(f"remaining_mlp_layers: {mlp_z}")

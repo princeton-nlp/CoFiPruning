@@ -16,7 +16,7 @@ This repository contains the code and pruned models for our ACL'22 paper [Struct
 
 ## Overview
 
-We propose CoFiPruning, a task-specific, structured pruning approach (**Co**arse and **Fi**ne-grained Pruning) and show that structured pruning can achieve highly compact subnetworks and obtain large speedups and competitive accuracy as distillation approaches, while requiring much less computation. Our key insight is to jointly prune coarse-grained units (e.g., self-attention or feed-forward layers) and fine-grained units (e.g., heads, hidden dimensions) simultaneously. Different from existing works, our approach controls the pruning decision of every single parameter by multiple masks of different granularity. This is the key to large compression, as it allows the greatest flexibility of pruned structures and eases the optimization compared to only pruning small units.
+We propose CoFiPruning, a task-specific, structured pruning approach (**Co**arse and **Fi**ne-grained Pruning) and show that structured pruning can achieve highly compact subnetworks and obtain large speedups and competitive accuracy as distillation approaches, while requiring much less computation. Our key insight is to jointly prune coarse-grained units (e.g., self-attention or feed-forward layers) and fine-grained units (e.g., heads, hidden dimensions) simultaneously. Different from existing works, our approach controls the pruning decision of every single parameter by multiple masks of different granularity. This is the key to large compression, as it allows the greatest flexibility of pruned structures and eases the optimization compared to only pruning small units. We also devise a layerwise distillation strategy to transfer knowledge from unpruned to pruned models during optimization. 
 
 ![](figures/main_figure.png)
 
@@ -67,8 +67,8 @@ We provide example training scripts for training with CoFiPruning with different
 - `--task_name`: we support sequence classification tasks and extractive question answer tasks. You can input a glue task name, e.g., `MNLI` or use `--train_file` and `--validation_file` arguments with other tasks (supported by HuggingFace).
 - `--ex_name_suffix`: experiment name (for output dir)
 - `--ex_cate`: experiment category name (for output dir)
-- `--pruning_type`: we support all combinations of the following four types of pruning units. Default pruning type is `structured_head+structured_mlp+hidden+layer`. Setting it to `None` falls back to standard fine-tuning.
-  - `structured_head`: head pruning
+- `--pruning_type`: we support all combinations of the following four types of pruning units. Default pruning type is `structured_heads+structured_mlp+hidden+layer`. Setting it to `None` falls back to standard fine-tuning.
+  - `structured_heads`: head pruning
   - `structured_mlp`: mlp intermediate dimension pruning
   - `hidden`: hidden states pruning
   - `layer`: layer pruning

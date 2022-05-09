@@ -133,9 +133,11 @@ We use the following hyperparamters for training CoFiPruning:
 | Layer distill. alpha | 0.9, 0.7, 0.5|0.9, 0.7, 0.5|0.9, 0.7, 0.5|
 | Cross entropy distill. alpha | 0.1, 0.3, 0.5|0.1, 0.3, 0.5|0.1, 0.3, 0.5|
 | Pruning epochs | 100 | 20 | 20 |
+| Pre-finetuning epochs | 4 | 1 | 1 |
+| Sparsity warmup epochs | 20 | 2 | 2 |
 | Finetuning epochs | 20 | 20 | 20 |
 
-GLUE (small) denotes the GLUE tasks with a relatively smaller size including CoLA, STS-B, MRPC and RTE and GLUE (large) denotes the rest of the GLUE tasks including SST-2, MNLI, QQP and QNLI.
+GLUE (small) denotes the GLUE tasks with a relatively smaller size including CoLA, STS-B, MRPC and RTE and GLUE (large) denotes the rest of the GLUE tasks including SST-2, MNLI, QQP and QNLI. Note that hyperparameter search is essential for small-sized datasets but is less important for large-sized datasets. 
 
 
 ## Bugs or Questions?

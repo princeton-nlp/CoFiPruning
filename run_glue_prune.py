@@ -9,7 +9,7 @@ import datasets
 import numpy as np
 import torch
 import transformers
-from datasets import load_dataset, load_metric
+from datasets import load_dataset, load_metric, DatasetDict
 from transformers import AutoConfig, AutoTokenizer, EvalPrediction, default_data_collator, DataCollatorWithPadding
 from transformers import (HfArgumentParser, TrainingArguments, PretrainedConfig,
                           glue_output_modes, glue_tasks_num_labels, set_seed)
@@ -89,19 +89,22 @@ def main():
                        training_args, additional_args)
 
     
-    
+    t_name = None 
     if data_args.task_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
             "glue", data_args.task_name.replace("-", ""), cache_dir=model_args.cache_dir)
+        t_name = data_args.task_name
     elif data_args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
             data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir
         )
+        t_name = data_args.dataset_name
     else:
         # Loading a dataset from your local files.
         # CSV/JSON training and evaluation files are needed.
+        t_name = data_args.t_name
         data_files = {"train": data_args.train_file,
                       "validation": data_args.validation_file}
 
@@ -126,6 +129,11 @@ def main():
             # Loading a dataset from local csv files
             raw_datasets = load_dataset(
                 "csv", data_files=data_files, cache_dir=model_args.cache_dir)
+        elif data_args.train_file.endswith(".tsv"):
+            dataset_dict = {}
+            for key in data_files:
+                dataset_dict[key] = load_from_tsv(data_files[key])
+            raw_datasets = DatasetDict(dataset_dict)
         else:
             # Loading a dataset from local json files
             raw_datasets = load_dataset(
@@ -157,7 +165,7 @@ def main():
     config = AutoConfig.from_pretrained(
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         num_labels=num_labels,
-        finetuning_task=data_args.task_name,
+        finetuning_task=t_name,
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
@@ -208,9 +216,7 @@ def main():
     
     if additional_args.pretrained_pruned_model is not None:
         zs = load_zs(additional_args.pretrained_pruned_model)
-
         model = load_model(additional_args.pretrained_pruned_model, Model, zs)
-        prune_model_with_z(zs, model)
         print(
             f"Model Size after pruning: {calculate_parameters(model)}")
 

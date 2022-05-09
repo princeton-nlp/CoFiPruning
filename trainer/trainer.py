@@ -39,7 +39,12 @@ glue_tasks = {"cola": "mcc",
               "stsb": "corr",
               "qqp": "accuracy",
               "qnli": "accuracy",
-              "rte": "accuracy"}
+              "rte": "accuracy",
+              "sst2_aug": "accuracy",
+              "rte_aug": "accuracy",
+              "mrpc_aug": "accuracy",
+              "qnli_aug": "accuracy",
+              "stsb_aug": "corr",}
 
 class Eval_Counter():
     def __init__(self):
@@ -509,7 +514,7 @@ class CoFiTrainer(Trainer):
                     eval_score = output.metrics[na]
                     break
         
-        logger.info(f"starting saving best: {self.global_step} {self.start_saving_best}")
+        # logger.info(f"starting saving best: {self.global_step} {self.start_saving_best}")
         
         if self.start_saving_best:
             best_so_far = self.eval_counter.update(
@@ -608,6 +613,8 @@ class CoFiTrainer(Trainer):
 
                 layerwise = torch.arange(4).to(device)
                 layer_loss += layerwiseloss[layerwise, alignment].sum()
+                if self.global_step % 100 == 0:
+                    logger.info(f"v{self.additional_args.layer_distill_version} Global step: {self.global_step}, Alignment: " + str(alignment))
             return layer_loss
         else:
             return None
@@ -627,7 +634,6 @@ class CoFiTrainer(Trainer):
         if distill_loss is not None:
             loss += self.additional_args.distill_loss_alpha * distill_loss
             
-
         return distill_loss, ce_distill_loss, loss
 
     def shortens_inputs(self, inputs):

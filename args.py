@@ -49,6 +49,8 @@ class AdditionalArguments():
     def __post_init__(self):
         if self.pretrained_pruned_model == "None":
             self.pretrained_pruned_model = None
+        if self.pruning_type == "None":
+            self.pruning_type = None
 
         
 
@@ -68,6 +70,11 @@ class DataTrainingArguments:
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
+    
+    t_name: Optional[str] = field(
+        default=None, metadata={"help": "The name of the training and validation files."}
+    )
+
     dataset_config_name: Optional[str] = field(
         default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
     )
@@ -128,8 +135,9 @@ class DataTrainingArguments:
             raise ValueError("Need either a GLUE task, a training/validation file or a dataset name.")
         else:
             train_extension = self.train_file.split(".")[-1]
-            assert train_extension in ["csv", "json"], "`train_file` should be a csv or a json file."
+            assert train_extension in ["csv", "json", "tsv"], "`train_file` should be a csv or a json file."
             validation_extension = self.validation_file.split(".")[-1]
+            self.t_name = self.t_name.lower()
             assert (
                 validation_extension == train_extension
             ), "`validation_file` should have the same extension (csv or json) as `train_file`."

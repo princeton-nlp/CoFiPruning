@@ -108,8 +108,6 @@ LAYER_DISTILL_VERSION=4
 bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION
 ```
 
-The trainer will save the best-performing model that meets the sparsity requirement under the folder `$proj_dir/$TASK/$EX_CATE/${TASK}_${SUFFIX}/best`.
-
 An example for fine_tuning after pruning is as follows:
 ```bash
 PRUNED_MODEL_PATH=$proj_dir/$TASK/$EX_CATE/${TASK}_${SUFFIX}/best

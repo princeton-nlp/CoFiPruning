@@ -128,7 +128,7 @@ We use the following hyperparamters for training CoFiPruning:
 |               | GLUE (small) | GLUE (large) | SQuAD|
 |:--------------|:-----------:|:--------------:|:---------:|
 | Batch size    | 32          | 32            | 16       |
-| Pruning Learning rate  | 2e-5 | 2e-5 | 3e-5 |
+| Pruning learning rate  | 2e-5 | 2e-5 | 3e-5 |
 | Fine-tuning learning rate |     1e-5, 2e-5, 3e-5      |1e-5, 2e-5, 3e-5|1e-5, 2e-5, 3e-5|
 | Layer distill. alpha | 0.9, 0.7, 0.5|0.9, 0.7, 0.5|0.9, 0.7, 0.5|
 | Cross entropy distill. alpha | 0.1, 0.3, 0.5|0.1, 0.3, 0.5|0.1, 0.3, 0.5|

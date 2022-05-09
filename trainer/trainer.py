@@ -32,7 +32,7 @@ from utils.utils import *
 
 logger = logging.get_logger(__name__)
 
-glue_tasks = {"cola": "mcc",
+glue_tasks = {"cola": "matthews_correlation",
               "mnli": "mnli/acc",
               "mrpc": "accuracy",
               "sst2": "accuracy",
@@ -523,11 +523,12 @@ class CoFiTrainer(Trainer):
                 best_dir = os.path.join(self.args.output_dir, "best")
                 if not os.path.exists(best_dir):
                     os.makedirs(best_dir)
-                zs = None
 
-                torch.save(zs, os.path.join(best_dir, "zs.pt"))
-                torch.save(self.l0_module, os.path.join(
-                    best_dir, "l0_module.pt"))
+                if self.l0_module is not None:
+                    zs = self.l0_module.forward(training=False)
+                    torch.save(zs, os.path.join(best_dir, "zs.pt"))
+                    torch.save(self.l0_module, os.path.join(
+                        best_dir, "l0_module.pt"))
                 logger.info(f"Saving the best model so far: [Epoch {int(self.epoch)} | Step: {self.global_step} | Model size: {output.metrics['remaining_params'] if 'remaining_params' in output.metrics else 'Full' } | Score: {round(eval_score, 5)}]")
                 self.model.save_pretrained(best_dir)
 

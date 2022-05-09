@@ -18,7 +18,10 @@ def initialize_layer_transformation(model):
     model.layer_transformation.bias.data.fill_(0)
 
 def load_model_with_zs(model_path, model_class, zs=None):
-    model = model_class.from_pretrained(model_path)
+    config_path = os.path.join(model_path, "config.json")
+    if os.path.exists(config_path):
+        config = AutoConfig.from_pretrained(model_path)
+    model = model_class.from_pretrained(model_path, config=config)
     p = os.path.join(model_path, "pytorch_model.bin")
     loaded_weights = torch.load(p, map_location="cpu")
     model.load_state_dict(loaded_weights)
@@ -243,6 +246,9 @@ def load_zs(model_path):
 
     if os.path.exists(zs_path):
         zs = torch.load(zs_path, map_location="cpu")
+        if zs is None:
+            l0_module = torch.load(os.path.join(model_path, "l0_module.pt"), map_location="cpu")
+            zs = l0_module.forward(training=False)
         return zs
     else:
         return None

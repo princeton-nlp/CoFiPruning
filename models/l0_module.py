@@ -214,7 +214,6 @@ class L0Module(Module):
 
     def get_num_parameters_and_constraint_for_hidden(self):
         num_parameters = 0
-        constraint_loss = 0
        
         # 12 * 1 * 1
         # 12 * 12 * 1
@@ -234,12 +233,11 @@ class L0Module(Module):
 
         int_score = (intlayer_score * int_score).reshape(-1)
         num_parameters += torch.sum(torch.outer(hidden_score, int_score)) * 2
-        return num_parameters, constraint_loss
+        return num_parameters
 
 
     def get_num_parameters_and_constraint(self):
         num_parameters = 0
-        constraint_loss = 0
 
         all_head_score, head_score = self.transform_scores_for_head()
         
@@ -252,7 +250,7 @@ class L0Module(Module):
 
         int_score = int_score * intlayer_score
         num_parameters += torch.sum(int_score) * self.parameters_per_dim["intermediate"]
-        return num_parameters, constraint_loss
+        return num_parameters
 
 
     def get_target_sparsity(self, pruned_steps):
@@ -263,9 +261,9 @@ class L0Module(Module):
     def lagrangian_regularization(self, pruned_steps):
         target_sparsity = self.target_sparsity
         if "hidden" in self.types:
-            expected_size, constraint = self.get_num_parameters_and_constraint_for_hidden()
+            expected_size = self.get_num_parameters_and_constraint_for_hidden()
         else:
-            expected_size, constraint = self.get_num_parameters_and_constraint()
+            expected_size = self.get_num_parameters_and_constraint()
         expected_sparsity = 1 - expected_size / self.prunable_model_size
         if self.lagrangian_warmup > 0:
             target_sparsity = self.get_target_sparsity(pruned_steps)
@@ -273,7 +271,6 @@ class L0Module(Module):
                 self.lambda_1 * (expected_sparsity - target_sparsity)
                 + self.lambda_2 * (expected_sparsity - target_sparsity) ** 2
         )
-        lagrangian_loss += constraint
         return lagrangian_loss, expected_sparsity, target_sparsity
 
     def get_eps(self, size):

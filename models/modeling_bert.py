@@ -78,10 +78,10 @@ class CoFiBertForSequenceClassification(BertForSequenceClassification):
         for old_key, new_key in zip(old_keys, new_keys):
             weights[new_key] = weights.pop(old_key)
         
-        drop_weight_names = ["layer_transformation.weight", "layer_transformation.bias"]
-        for name in drop_weight_names:
-            if name in weights:
-                weights.pop(name)
+        # drop_weight_names = ["layer_transformation.weight", "layer_transformation.bias"]
+        # for name in drop_weight_names:
+        #     if name in weights:
+        #         weights.pop(name)
 
         if "config" not in kwargs:
             config = AutoConfig.from_pretrained(pretrained_model_name_or_path)

@@ -46,11 +46,11 @@ output_dir=${proj_dir}/out/${task_name}/${ex_cate}/${ex_name}
 pruning_type=$4
 target_sparsity=$5
 distillation_path=$6
-distill_loss_alpha=$7
+distill_layer_loss_alpha=$7
 distill_ce_loss_alpha=$8
 distill_temp=2
 # 2: fix hidden layers, 3: min distance matching without restriction, 4: min distance matching with restriction
-layer_distill_version=${10} 
+layer_distill_version=${9} 
 
 scheduler_type=linear
 
@@ -61,7 +61,6 @@ if [[ " ${glue_low[*]} " =~ ${task_name} ]]; then
     start_saving_best_epochs=50
     prepruning_finetune_epochs=4
     lagrangian_warmup_epochs=20
-    reg_learning_rate=$9
 fi
 
 if [[ " ${glue_high[*]} " =~ ${task_name} ]]; then
@@ -74,8 +73,8 @@ pretrained_pruned_model=None
 
 # FT after pruning
 if [[ $pruning_type == None ]]; then
-  pretrained_pruned_model=${11}
-  learning_rate=${12}
+  pretrained_pruned_model=${10}
+  learning_rate=${11}
   scheduler_type=none
   output_dir=$pretrained_pruned_model/FT-lr${learning_rate}
   epochs=20
@@ -111,7 +110,7 @@ python3 $code_dir/run_glue_prune.py \
      --do_layer_distill \
      --distillation_path $distillation_path \
      --distill_ce_loss_alpha $distill_ce_loss_alpha \
-     --distill_loss_alpha $distill_loss_alpha \
+     --distill_loss_alpha $distill_layer_loss_alpha \
      --distill_temp $distill_temp \
      --scheduler_type $scheduler_type \
      --layer_distill_version $layer_distill_version \

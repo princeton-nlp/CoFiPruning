@@ -172,7 +172,7 @@ If you have any questions related to the code or the paper, feel free to email M
 Please cite our paper if you use CoFiPruning in your work:
 
 ```bibtex
-@inproceedings{xia2022cofi,
+@inproceedings{xia2022structured,
    title={Structured Pruning Learns Compact and Accurate Models},
    author={Xia, Mengzhou and Zhong, Zexuan and Chen, Danqi},
    booktitle={Association for Computational Linguistics (ACL)},

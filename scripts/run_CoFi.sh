@@ -1,4 +1,11 @@
 #!/bin/bash
+#SBATCH --job-name=sample
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1
+#SBATCH -A pnlp
+#SBATCH -t 11:00:00
+
 
 glue_low=(MRPC RTE STSB CoLA)
 glue_high=(MNLI QQP QNLI SST2)
@@ -42,10 +49,8 @@ distillation_path=$6
 distill_loss_alpha=$7
 distill_ce_loss_alpha=$8
 distill_temp=2
-# 2: fix hidden layers, 3: min distance matching without restriction, 4: mix distance matching with restriction
-layer_distill_version=3 
-prepruning_finetune_epochs=1
-lagrangian_warmup_epochs=2
+# 2: fix hidden layers, 3: min distance matching without restriction, 4: min distance matching with restriction
+layer_distill_version=${10} 
 
 scheduler_type=linear
 
@@ -54,25 +59,30 @@ if [[ " ${glue_low[*]} " =~ ${task_name} ]]; then
     eval_steps=50
     epochs=100
     start_saving_best_epochs=50
+    prepruning_finetune_epochs=4
+    lagrangian_warmup_epochs=20
+    reg_learning_rate=$9
 fi
 
 if [[ " ${glue_high[*]} " =~ ${task_name} ]]; then
     eval_steps=500
+    prepruning_finetune_epochs=1
+    lagrangian_warmup_epochs=2
 fi
-
-seed=9
 
 pretrained_pruned_model=None
 
 # FT after pruning
 if [[ $pruning_type == None ]]; then
-  pretrained_pruned_model=${10}
-  learning_rate=${11}
+  pretrained_pruned_model=${11}
+  learning_rate=${12}
   scheduler_type=none
   output_dir=$pretrained_pruned_model/FT-lr${learning_rate}
   epochs=20
   batch_size=64
 fi
+
+mkdir -p $output_dir
 
 python3 $code_dir/run_glue_prune.py \
 	   --output_dir ${output_dir} \
@@ -104,4 +114,6 @@ python3 $code_dir/run_glue_prune.py \
      --distill_loss_alpha $distill_loss_alpha \
      --distill_temp $distill_temp \
      --scheduler_type $scheduler_type \
-     --layer_distill_version $layer_distill_version
+     --layer_distill_version $layer_distill_version \
+     --prepruning_finetune_epochs $prepruning_finetune_epochs \
+     --lagrangian_warmup_epochs $lagrangian_warmup_epochs 2>&1 | tee ${output_dir}/log.txt

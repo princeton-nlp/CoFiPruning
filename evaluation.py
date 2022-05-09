@@ -187,7 +187,7 @@ def glue_preprocess_function(examples):
     # Tokenize the texts
     sentence1_key, sentence2_key = task_to_keys[task_name]
     max_seq_length = 128
-    padding = True
+    padding = "max_length"
     args = (
         (examples[sentence1_key],) if sentence2_key is None else (
             examples[sentence1_key], examples[sentence2_key])
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     bs = 128
 
     tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path, use_fast=True if task_name == "squad" else False)
+        model_name_or_path, use_fast=True if task_name == "squad" else False, padding_side="right", truncation_size="right")
 
     if task_name != "squad":
         # data_args = DataTrainingArguments(task_name=task_name,

@@ -96,13 +96,27 @@ Note that during fine-tuning stage, `pruning_type` should be set to `None`.
 
 An example for training (pruning) is as follows:
 ```bash
-bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi structured_head+structured_mlp+hidden+layer 0.95 [DISTILLATION_PATH] 0.7 0.3
+TASK=MNLI
+SUFFIX=sparsity0.95
+EX_CATE=CoFi
+PRUNING_TYPE=structured_head+structured_mlp+hidden+layer
+SPARSITY=0.95
+DISTILL_LAYER_LOSS_ALPHA=0.9
+DISTILL_CE_LOSS_ALPHA=0.1
+LAYER_DISTILL_VERSION=4
+
+bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION
 ```
+
+The trainer will save the best-performing model that meets the sparsity requirement under the folder `$proj_dir/$TASK/$EX_CATE/${TASK}_${SUFFIX}/best`.
 
 An example for fine_tuning after pruning is as follows:
 ```bash
-PRUNED_MODEL_PATH=$proj_dir/$task/$ex_cate/${task}_${suffix}
-bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi None [DISTILLATION_PATH] 0.7 0.3 [PRUNED_MODEL_PATH] 3e-5
+PRUNED_MODEL_PATH=$proj_dir/$TASK/$EX_CATE/${TASK}_${SUFFIX}/best
+PRUNING_TYPE=None # Setting the pruning type to be None for standard fine-tuning.
+LEARNING_RATE=3e-5
+
+bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION [PRUNED_MODEL_PATH] $LEARNING_RATE
 ```
 
 The training process will save the model with the best validation accuracy under `$PRUNED_MODEL_PATH/best`. And you can use the `evaluation.py` script for evaluation.

@@ -87,6 +87,7 @@ We provide example training scripts for training with CoFiPruning with different
 - `--distillation_path`: the directory of the teacher model
 - `--distillation_loss_alpha`: weight for layer distillation
 - `--distillation_ce_loss_alpha`: weight for cross entropy distillation
+- `--layer_distill_version`: we recommend using version 4 for small-sized datasets to impose an explicit restriction on layer orders but for relatively larger datasets, version 3 and version 4 do not make much difference.
 
 After pruning the model, the same script could be used for further fine-tuning the pruned model with following arguments:
 - `--pretrained_pruned_model`: directory of the pruned model

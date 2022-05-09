@@ -43,12 +43,12 @@ Our released models are listed as following. You can download these models with 
 | [princeton-nlp/CoFi-SST2-s95](https://huggingface.co/princeton-nlp/CoFi-SST2-s95) | SST-2  |  94.5% | 12.2 ×| 90.4 |  
 |  [princeton-nlp/CoFi-SQuAD-s60](https://huggingface.co/princeton-nlp/CoFi-SQuAD-s60) |  SQuAD |  59.8% | 2.0 ×| 89.1 |  
 | [princeton-nlp/CoFi-SQuAD-s93](https://huggingface.co/princeton-nlp/CoFi-SQuAD-s93) | SQuAD  |  92.4% | 8.7 ×| 82.6 |  
-| [princeton-nlp/CoFi-RTE-s60](https://huggingface.co/princeton-nlp/CoFi-RTE-s60) | RTE | 60.2% | 2.0 x | 72.56 |
-| [princeton-nlp/CoFi-RTE-s96](https://huggingface.co/princeton-nlp/CoFi-RTE-s96) | RTE | 96.2% | 12.8 x | 66.06 |
-| [princeton-nlp/CoFi-CoLA-s60](https://huggingface.co/princeton-nlp/CoFi-CoLA-s60) | CoLA | 60.4% | 2.0 x | 60.41 |
-| [princeton-nlp/CoFi-CoLA-s95](https://huggingface.co/princeton-nlp/CoFi-CoLA-s95) | CoLA | 95.1% | 12.3 x | 38.90 |
-| [princeton-nlp/CoFi-MRPC-s60](https://huggingface.co/princeton-nlp/CoFi-MRPC-s60) | MRPC | 61.5% | 2.0 x | 86.76 |
-| [princeton-nlp/CoFi-MRPC-s95](https://huggingface.co/princeton-nlp/CoFi-MRPC-s95) | MRPC | 94.9% | 12.2 x | 83.58 |
+| [princeton-nlp/CoFi-RTE-s60](https://huggingface.co/princeton-nlp/CoFi-RTE-s60) | RTE | 60.2% | 2.0 x | 72.6 |
+| [princeton-nlp/CoFi-RTE-s96](https://huggingface.co/princeton-nlp/CoFi-RTE-s96) | RTE | 96.2% | 12.8 x | 66.1 |
+| [princeton-nlp/CoFi-CoLA-s60](https://huggingface.co/princeton-nlp/CoFi-CoLA-s60) | CoLA | 60.4% | 2.0 x | 60.4 |
+| [princeton-nlp/CoFi-CoLA-s95](https://huggingface.co/princeton-nlp/CoFi-CoLA-s95) | CoLA | 95.1% | 12.3 x | 38.9 |
+| [princeton-nlp/CoFi-MRPC-s60](https://huggingface.co/princeton-nlp/CoFi-MRPC-s60) | MRPC | 61.5% | 2.0 x | 86.8 |
+| [princeton-nlp/CoFi-MRPC-s95](https://huggingface.co/princeton-nlp/CoFi-MRPC-s95) | MRPC | 94.9% | 12.2 x | 83.6 |
 
 You can use these models with the huggingface interface:
 ```python

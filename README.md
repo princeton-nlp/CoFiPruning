@@ -2,6 +2,11 @@
 
 This repository contains the code and pruned models for our ACL'22 paper [Structured Pruning Learns Compact and Accurate Models](https://arxiv.org/pdf/2204.00408.pdf).
 
+**************************** **Updates** ****************************
+
+* 05/09/2022: We release the pruned model checkpoints on RTE, MRPC and CoLA!
+* 04/01/2022: We released [our paper](https://arxiv.org/pdf/2204.00408.pdf) along with pruned model checkpoints on SQuAD, SST-2, QNLI and MNLI. Check it out!
+
 ## Quick Links
 
 - [Overview](#overview)
@@ -38,6 +43,12 @@ Our released models are listed as following. You can download these models with 
 | [princeton-nlp/CoFi-SST2-s95](https://huggingface.co/princeton-nlp/CoFi-SST2-s95) | SST-2  |  94.5% | 12.2 ×| 90.4 |  
 |  [princeton-nlp/CoFi-SQuAD-s60](https://huggingface.co/princeton-nlp/CoFi-SQuAD-s60) |  SQuAD |  59.8% | 2.0 ×| 89.1 |  
 | [princeton-nlp/CoFi-SQuAD-s93](https://huggingface.co/princeton-nlp/CoFi-SQuAD-s93) | SQuAD  |  92.4% | 8.7 ×| 82.6 |  
+| [princeton-nlp/CoFi-RTE-s60](https://huggingface.co/princeton-nlp/CoFi-RTE-s60) | RTE | 60.2% | 2.0 x | 72.6 |
+| [princeton-nlp/CoFi-RTE-s96](https://huggingface.co/princeton-nlp/CoFi-RTE-s96) | RTE | 96.2% | 12.8 x | 66.1 |
+| [princeton-nlp/CoFi-CoLA-s60](https://huggingface.co/princeton-nlp/CoFi-CoLA-s60) | CoLA | 60.4% | 2.0 x | 60.4 |
+| [princeton-nlp/CoFi-CoLA-s95](https://huggingface.co/princeton-nlp/CoFi-CoLA-s95) | CoLA | 95.1% | 12.3 x | 38.9 |
+| [princeton-nlp/CoFi-MRPC-s60](https://huggingface.co/princeton-nlp/CoFi-MRPC-s60) | MRPC | 61.5% | 2.0 x | 86.8 |
+| [princeton-nlp/CoFi-MRPC-s95](https://huggingface.co/princeton-nlp/CoFi-MRPC-s95) | MRPC | 94.9% | 12.2 x | 83.6 |
 
 You can use these models with the huggingface interface:
 ```python
@@ -76,6 +87,7 @@ We provide example training scripts for training with CoFiPruning with different
 - `--distillation_path`: the directory of the teacher model
 - `--distillation_loss_alpha`: weight for layer distillation
 - `--distillation_ce_loss_alpha`: weight for cross entropy distillation
+- `--layer_distill_version`: we recommend using version 4 for small-sized datasets to impose an explicit restriction on layer orders but for relatively larger datasets, version 3 and version 4 do not make much difference.
 
 After pruning the model, the same script could be used for further fine-tuning the pruned model with following arguments:
 - `--pretrained_pruned_model`: directory of the pruned model
@@ -84,13 +96,25 @@ Note that during fine-tuning stage, `pruning_type` should be set to `None`.
 
 An example for training (pruning) is as follows:
 ```bash
-bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi structured_head+structured_mlp+hidden+layer 0.95 [DISTILLATION_PATH] 0.7 0.3
+TASK=MNLI
+SUFFIX=sparsity0.95
+EX_CATE=CoFi
+PRUNING_TYPE=structured_head+structured_mlp+hidden+layer
+SPARSITY=0.95
+DISTILL_LAYER_LOSS_ALPHA=0.9
+DISTILL_CE_LOSS_ALPHA=0.1
+LAYER_DISTILL_VERSION=4
+
+bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION
 ```
 
 An example for fine_tuning after pruning is as follows:
 ```bash
-PRUNED_MODEL_PATH=$proj_dir/$task/$ex_cate/${task}_${suffix}
-bash scripts/run_CoFi.sh MNLI sparsity0.95 CoFi None [DISTILLATION_PATH] 0.7 0.3 [PRUNED_MODEL_PATH] 3e-5
+PRUNED_MODEL_PATH=$proj_dir/$TASK/$EX_CATE/${TASK}_${SUFFIX}/best
+PRUNING_TYPE=None # Setting the pruning type to be None for standard fine-tuning.
+LEARNING_RATE=3e-5
+
+bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION [PRUNED_MODEL_PATH] $LEARNING_RATE
 ```
 
 The training process will save the model with the best validation accuracy under `$PRUNED_MODEL_PATH/best`. And you can use the `evaluation.py` script for evaluation.
@@ -128,14 +152,16 @@ We use the following hyperparamters for training CoFiPruning:
 |               | GLUE (small) | GLUE (large) | SQuAD|
 |:--------------|:-----------:|:--------------:|:---------:|
 | Batch size    | 32          | 32            | 16       |
-| Pruning Learning rate  | 2e-5 | 2e-5 | 3e-5 |
+| Pruning learning rate  | 2e-5 | 2e-5 | 3e-5 |
 | Fine-tuning learning rate |     1e-5, 2e-5, 3e-5      |1e-5, 2e-5, 3e-5|1e-5, 2e-5, 3e-5|
 | Layer distill. alpha | 0.9, 0.7, 0.5|0.9, 0.7, 0.5|0.9, 0.7, 0.5|
 | Cross entropy distill. alpha | 0.1, 0.3, 0.5|0.1, 0.3, 0.5|0.1, 0.3, 0.5|
 | Pruning epochs | 100 | 20 | 20 |
+| Pre-finetuning epochs | 4 | 1 | 1 |
+| Sparsity warmup epochs | 20 | 2 | 2 |
 | Finetuning epochs | 20 | 20 | 20 |
 
-GLUE (small) denotes the GLUE tasks with a relatively smaller size including CoLA, STS-B, MRPC and RTE and GLUE (large) denotes the rest of the GLUE tasks including SST-2, MNLI, QQP and QNLI.
+GLUE (small) denotes the GLUE tasks with a relatively smaller size including CoLA, STS-B, MRPC and RTE and GLUE (large) denotes the rest of the GLUE tasks including SST-2, MNLI, QQP and QNLI. Note that hyperparameter search is essential for small-sized datasets but is less important for large-sized datasets. 
 
 
 ## Bugs or Questions?
@@ -146,7 +172,7 @@ If you have any questions related to the code or the paper, feel free to email M
 Please cite our paper if you use CoFiPruning in your work:
 
 ```bibtex
-@inproceedings{xia2022cofi,
+@inproceedings{xia2022structured,
    title={Structured Pruning Learns Compact and Accurate Models},
    author={Xia, Mengzhou and Zhong, Zexuan and Chen, Danqi},
    booktitle={Association for Computational Linguistics (ACL)},

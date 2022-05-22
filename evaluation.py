@@ -238,7 +238,11 @@ if __name__ == '__main__':
         # data_args = DataTrainingArguments(task_name=task_name,
         #   data_dir=os.path.join(data_dir, task_name))
         # dataset = GlueDataset(data_args, tokenizer=tokenizer, mode="dev")
-        dataset = datasets.load_dataset("glue", task_name)["validation"]
+        if task_name == "mnli":
+            set_name = "validation_matched"
+        else:
+            set_name = "validation"
+        dataset = datasets.load_dataset("glue", task_name)[set_name]
         dataset = dataset.map(glue_preprocess_function, batched=True)
         compute_metrics = get_glue_metric()
     else:

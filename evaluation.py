@@ -192,8 +192,14 @@ def glue_preprocess_function(examples):
         (examples[sentence1_key],) if sentence2_key is None else (
             examples[sentence1_key], examples[sentence2_key])
     )
+
     result = tokenizer(*args, padding=padding,
                        max_length=max_seq_length, truncation=True)
+    if task_name == "mnli" and model_name_or_path.startswith("princeton-nlp/"):
+        # legacy issue of using GLUEDataset
+        label_to_id = {1:2, 0:1, 2:0}
+        labels = [label_to_id[i] for i in examples["label"]]
+        result["label"] = labels
     return result
 
 
@@ -244,6 +250,7 @@ if __name__ == '__main__':
             set_name = "validation"
         dataset = datasets.load_dataset("glue", task_name)[set_name]
         dataset = dataset.map(glue_preprocess_function, batched=True)
+
         compute_metrics = get_glue_metric()
     else:
         metric = load_metric("squad")
@@ -277,7 +284,12 @@ if __name__ == '__main__':
 
     zs = load_zs(model_name_or_path)
 
-    model = model_class.from_pretrained(model_name_or_path)
+    # for compressed models
+    if zs is None:
+        model = model_class.from_pretrained(model_name_or_path)
+    # for full models with compression vectors zs
+    else:
+        model = load_model(model_name_or_path, model_class, zs)
 
     model = model.cuda()
     model = model.eval()

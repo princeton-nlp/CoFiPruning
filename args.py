@@ -36,6 +36,7 @@ class AdditionalArguments():
     prepruning_finetune_epochs: int = field(default=1, metadata={"help": "Finetuning epochs before pruning"})
     lagrangian_warmup_epochs: int = field(default=2, metadata={"help": "Number of epochs for lagrangian warmup"})
     target_sparsity: float = field(default=0, metadata={"help": "Target sparsity (pruned percentage)"})
+    sparsity_epsilon: float = field(default=0, metadata={"help": "Epsilon for sparsity"})
 
     # distillation setup
     distillation_path: str = field(default=None, metadata={"help": "Path of the teacher model for distillation."})

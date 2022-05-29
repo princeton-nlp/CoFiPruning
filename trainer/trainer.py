@@ -483,7 +483,7 @@ class CoFiTrainer(Trainer):
             metrics["expected_sparsity"] = expected_sparsity
             metrics["target_sparsity"] = target_sparsity
 
-            if (not self.start_saving_best) and (expected_sparsity >= self.additional_args.target_sparsity):
+            if (not self.start_saving_best) and (expected_sparsity - self.additional_args.target_sparsity >= -self.additional_args.sparsity_epsilon):
                 self.start_saving_best = True
                 logger.info(f"Starting saving the best from epoch {int(self.epoch)} and step {self.global_step}")
 

@@ -9,6 +9,8 @@ This repository contains the code and pruned models for our ACL'22 paper [Struct
 
 ## Quick Links
 
+- [☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models](#-cofipruning-structured-pruning-learns-compact-and-accurate-models)
+- [Quick Links](#quick-links)
 - [Overview](#overview)
 - [Main Results](#main-results)
 - [Model List](#model-list)
@@ -88,6 +90,7 @@ We provide example training scripts for training with CoFiPruning with different
 - `--distillation_layer_loss_alpha`: weight for layer distillation
 - `--distillation_ce_loss_alpha`: weight for cross entropy distillation
 - `--layer_distill_version`: we recommend using version 4 for small-sized datasets to impose an explicit restriction on layer orders but for relatively larger datasets, version 3 and version 4 do not make much difference.
+- `--sparsity_epsilon`: the epsilon to relax the sparsity constraint. If set to be larger than 0, the training process will start saving models with a sparsity `target_sparsity - sparsity_epislon`. This is recommended to be set to be 0.01 when training with 0.95 sparsity to replicate our reported numbers, so that the models with a sparsity above 0.94 will be saved.
 
 After pruning the model, the same script could be used for further fine-tuning the pruned model with following arguments:
 - `--pretrained_pruned_model`: directory of the pruned model
@@ -104,8 +107,9 @@ SPARSITY=0.95
 DISTILL_LAYER_LOSS_ALPHA=0.9
 DISTILL_CE_LOSS_ALPHA=0.1
 LAYER_DISTILL_VERSION=4
+SPARSITY_EPSILON=0.01
 
-bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION
+bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION $SPARSITY_EPSILON
 ```
 
 An example for fine_tuning after pruning is as follows:
@@ -114,7 +118,7 @@ PRUNED_MODEL_PATH=$proj_dir/$TASK/$EX_CATE/${TASK}_${SUFFIX}/best
 PRUNING_TYPE=None # Setting the pruning type to be None for standard fine-tuning.
 LEARNING_RATE=3e-5
 
-bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION [PRUNED_MODEL_PATH] $LEARNING_RATE
+bash scripts/run_CoFi.sh $TASK $SUFFIX $EX_CATE $PRUNING_TYPE $SPARSITY [DISTILLATION_PATH] $DISTILL_LAYER_LOSS_ALPHA $DISTILL_CE_LOSS_ALPHA $LAYER_DISTILL_VERSION $SPARSITY_EPSILON [PRUNED_MODEL_PATH] $LEARNING_RATE
 ```
 
 The training process will save the model with the best validation accuracy under `$PRUNED_MODEL_PATH/best`. And you can use the `evaluation.py` script for evaluation.

@@ -247,6 +247,7 @@ def load_zs(model_path):
     if os.path.exists(zs_path):
         zs = torch.load(zs_path, map_location="cpu")
         if zs is None:
+            model_path = os.path.dirname(model_path)
             l0_module = torch.load(os.path.join(model_path, "l0_module.pt"), map_location="cpu")
             zs = l0_module.forward(training=False)
         return zs

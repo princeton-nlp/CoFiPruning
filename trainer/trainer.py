@@ -111,7 +111,7 @@ class CoFiTrainer(Trainer):
         logging.set_verbosity(log_level)
         logger.setLevel(log_level)
 
-    def create_optimizer_and_scheduler(self, num_training_steps: int, build_l0_optimizer:bool=False):
+    def create_optimizer_and_scheduler(self, num_training_steps: int, build_l0_optimizer:bool=True):
         def log_params(param_groups, des):
             for i, grouped_parameters in enumerate(param_groups):
                 logger.info(
@@ -273,7 +273,7 @@ class CoFiTrainer(Trainer):
                     lr_steps = self.t_total - self.global_step
 
                     # reset the optimizer
-                    self.create_optimizer_and_scheduler(lr_steps)
+                    self.create_optimizer_and_scheduler(lr_steps, self.start_prune)
                     logger.info("Starting l0 regularization!")
 
                 if self.start_prune:

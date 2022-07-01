@@ -54,7 +54,7 @@ Our released models are listed as following. You can download these models with 
 
 You can use these models with the huggingface interface:
 ```python
-from CoFiPruning.models import CoFiBertForSequenceClassification
+from models.modeling_bert import CoFiBertForSequenceClassification import CoFiBertForSequenceClassification
 model = CoFiBertForSequenceClassification.from_pretrained("princeton-nlp/CoFi-MNLI-s95") 
 output = model(**inputs)
 ```

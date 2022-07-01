@@ -664,7 +664,7 @@ class CoFiTrainer(Trainer):
             self.shortens_inputs(inputs)
             student_outputs = model(**inputs)
 
-            zs = {key: inputs[key] for key in inputs if "_z" in inputs}
+            zs = {key: inputs[key] for key in inputs if "_z" in key}
             distill_loss, distill_ce_loss, loss = self.calculate_distillation_loss(
                 teacher_outputs, student_outputs, zs)
         else:

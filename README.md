@@ -102,7 +102,7 @@ An example for training (pruning) is as follows:
 TASK=MNLI
 SUFFIX=sparsity0.95
 EX_CATE=CoFi
-PRUNING_TYPE=structured_head+structured_mlp+hidden+layer
+PRUNING_TYPE=structured_heads+structured_mlp+hidden+layer
 SPARSITY=0.95
 DISTILL_LAYER_LOSS_ALPHA=0.9
 DISTILL_CE_LOSS_ALPHA=0.1

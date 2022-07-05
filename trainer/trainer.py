@@ -583,7 +583,7 @@ class CoFiTrainer(Trainer):
                 existing_layers = None
                 if head_layer_z is not None:
                     existing_layers = head_layer_z != 0
-                    existing_layers = existing_layers.to(layerwiseloss)
+                    existing_layers = existing_layers.to(layerwiseloss.device)
 
                 layer_loss = 0
                 # no ordering restriction specified

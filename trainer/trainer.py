@@ -176,7 +176,7 @@ class CoFiTrainer(Trainer):
         num_update_steps_per_epoch = len(
             train_dataloader) // self.args.gradient_accumulation_steps
         num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
-        
+
         if self.l0_module is not None:
             lagrangian_warmup_steps = self.additional_args.lagrangian_warmup_epochs * num_update_steps_per_epoch
             self.prepruning_finetune_steps = self.additional_args.prepruning_finetune_epochs * num_update_steps_per_epoch
@@ -204,7 +204,7 @@ class CoFiTrainer(Trainer):
             * self.args.gradient_accumulation_steps
             * (torch.distributed.get_world_size() if self.args.local_rank != -1 else 1)
         )
-        
+
         logger.info("***** Running training *****")
 
         logger.info("  Num examples = %d", self.num_examples(train_dataloader))
@@ -281,7 +281,7 @@ class CoFiTrainer(Trainer):
                     self.fill_inputs_with_zs(zs, inputs)
 
                 loss_terms = self.training_step(model, inputs)
-                tr_loss_step = loss_terms["loss"] 
+                tr_loss_step = loss_terms["loss"]
                 lag_loss_step = loss_terms["lagrangian_loss"]
 
                 tr_loss += tr_loss_step
@@ -348,12 +348,12 @@ class CoFiTrainer(Trainer):
                         logging_lag_loss_scalar = lag_loss_scalar
 
                         self.log(logs)
-                    
+
                     if self.global_step % self.args.eval_steps == 0:
                         self.evaluate()
 
                 epoch_pbar.update(1)
-                
+
                 if self.args.max_steps > 0 and self.global_step >= self.args.max_steps:
                     break
 
@@ -513,9 +513,9 @@ class CoFiTrainer(Trainer):
                 if na in output.metrics:
                     eval_score = output.metrics[na]
                     break
-        
+
         # logger.info(f"starting saving best: {self.global_step} {self.start_saving_best}")
-        
+
         if self.start_saving_best:
             best_so_far = self.eval_counter.update(
                 self.epoch, self.global_step, eval_score)
@@ -583,6 +583,7 @@ class CoFiTrainer(Trainer):
                 existing_layers = None
                 if head_layer_z is not None:
                     existing_layers = head_layer_z != 0
+                    existing_layers = existing_layers.to(layerwiseloss.device)
 
                 layer_loss = 0
                 # no ordering restriction specified
@@ -634,7 +635,7 @@ class CoFiTrainer(Trainer):
         loss = self.additional_args.distill_ce_loss_alpha * ce_distill_loss
         if distill_loss is not None:
             loss += self.additional_args.distill_loss_alpha * distill_loss
-            
+
         return distill_loss, ce_distill_loss, loss
 
     def shortens_inputs(self, inputs):
@@ -664,7 +665,7 @@ class CoFiTrainer(Trainer):
             self.shortens_inputs(inputs)
             student_outputs = model(**inputs)
 
-            zs = {key: inputs[key] for key in inputs if "_z" in inputs}
+            zs = {key: inputs[key] for key in inputs if "_z" in key}
             distill_loss, distill_ce_loss, loss = self.calculate_distillation_loss(
                 teacher_outputs, student_outputs, zs)
         else:
@@ -681,7 +682,7 @@ class CoFiTrainer(Trainer):
             loss = loss / self.args.gradient_accumulation_steps
 
         loss.backward()
-        return {"loss": loss.detach(), 
+        return {"loss": loss.detach(),
                 "lagrangian_loss": lagrangian_loss.detach() if lagrangian_loss is not None else None,
                 "distill_layer_loss": distill_loss.detach() if distill_loss is not None else None,
                 "distill_ce_loss": distill_ce_loss.detach() if distill_ce_loss is not None else None}

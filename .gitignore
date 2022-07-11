@@ -141,3 +141,7 @@ cython_debug/
 .vscode
 
 scripts/push_to_hub.sh
+
+*.bin
+out/
+wandb/

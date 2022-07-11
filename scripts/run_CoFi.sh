@@ -10,9 +10,9 @@
 glue_low=(MRPC RTE STSB CoLA)
 glue_high=(MNLI QQP QNLI SST2)
 
-proj_dir=$n/space2
+proj_dir=.
 
-code_dir=${proj_dir}/CoFiPruning
+code_dir=${proj_dir}
 
 # task and data
 task_name=$1

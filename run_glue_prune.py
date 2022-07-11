@@ -23,6 +23,8 @@ from trainer.trainer import CoFiTrainer
 from utils.utils import *
 from models.model_args import ModelArguments
 
+import wandb
+
 task_to_keys = {
     "cola": ("sentence", None),
     "mnli": ("premise", "hypothesis"),
@@ -93,7 +95,7 @@ def main():
     if data_args.task_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
-            "glue", data_args.task_name.replace("-", ""), cache_dir=model_args.cache_dir)
+            "/mnt/lustre/sjtu/home/xc915/superb/CoFiPruning/glue.py", data_args.task_name.replace("-", ""), cache_dir=model_args.cache_dir)
         t_name = data_args.task_name
     elif data_args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
@@ -192,9 +194,9 @@ def main():
             additional_args.distillation_path,
             config=deepcopy(config)
         )
-        teacher_model.eval()
+        teacher_model.eval() #! inside has a cofibertmodel #! CofiBertForSequenceClassification
 
-    config.do_layer_distill = additional_args.do_layer_distill
+    config.do_layer_distill = additional_args.do_layer_distill #! True
 
     model = Model.from_pretrained(
         model_args.model_name_or_path,
@@ -203,7 +205,7 @@ def main():
         cache_dir=model_args.cache_dir,
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
-    )
+    ) #! inside the function, we get the original struct  #! CofiBertForSequenceClassification
 
     # initialize the layer transformation matrix to be an identity matrix
     if additional_args.do_layer_distill:
@@ -300,7 +302,7 @@ def main():
             batched=True,
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on dataset",
-        )
+        ) #! get dataset
     
     if training_args.do_train:
         if "train" not in raw_datasets:
@@ -384,6 +386,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # wandb.init(project='Cofi')
+    os.environ["WANDB_DISABLED"] = "true"
     t_start = time.time()
     main()
     t_end = time.time()

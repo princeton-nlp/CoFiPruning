@@ -124,12 +124,12 @@ class CoFiBertForSequenceClassification(BertForSequenceClassification):
             intermediate_z=intermediate_z,
             mlp_z=mlp_z,
             hidden_z=hidden_z
-        )
+        ) #! [32, 68, 768]
 
         pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
-        logits = self.classifier(pooled_output)
+        logits = self.classifier(pooled_output) #! [32, 3]
 
         loss = None
         if labels is not None:

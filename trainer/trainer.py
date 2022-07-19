@@ -30,6 +30,8 @@ from args import AdditionalArguments
 from utils.cofi_utils import *
 from utils.utils import *
 
+import wandb
+
 logger = logging.get_logger(__name__)
 
 glue_tasks = {"cola": "matthews_correlation",
@@ -94,7 +96,7 @@ class CoFiTrainer(Trainer):
         self.additional_args = additional_args
 
         self.l0_module = l0_module
-        self.prepruning_finetune_steps = 0
+        self.prepruning_finetune_steps = 100
         self.start_prune = False
 
         self.l0_optimizer = None
@@ -175,11 +177,11 @@ class CoFiTrainer(Trainer):
         train_dataloader = self.get_train_dataloader()
         num_update_steps_per_epoch = len(
             train_dataloader) // self.args.gradient_accumulation_steps
-        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1)
+        num_update_steps_per_epoch = max(num_update_steps_per_epoch, 1) #! 12272
 
         if self.l0_module is not None:
-            lagrangian_warmup_steps = self.additional_args.lagrangian_warmup_epochs * num_update_steps_per_epoch
-            self.prepruning_finetune_steps = self.additional_args.prepruning_finetune_epochs * num_update_steps_per_epoch
+            lagrangian_warmup_steps = self.additional_args.lagrangian_warmup_epochs * num_update_steps_per_epoch #! 24544
+            # self.prepruning_finetune_steps = self.additional_args.prepruning_finetune_epochs * num_update_steps_per_epoch
             self.l0_module.set_lagrangian_warmup_steps(lagrangian_warmup_steps)
             logger.info(f"Prepruning finetune steps: {self.prepruning_finetune_steps}")
             logger.info(f"Lagrangian warmup steps: {lagrangian_warmup_steps}")
@@ -248,7 +250,7 @@ class CoFiTrainer(Trainer):
         self.evaluate()
 
         # training
-        for epoch in range(epochs_trained, int(np.ceil(num_train_epochs))):
+        for epoch in range(epochs_trained, int(np.ceil(num_train_epochs))): #! 20 epoch
             epoch_start = time.time()
 
             if isinstance(train_dataloader, DataLoader) and isinstance(train_dataloader.sampler, DistributedSampler):
@@ -265,7 +267,7 @@ class CoFiTrainer(Trainer):
             self.eval_counter.clear()
 
             for step, inputs in enumerate(epoch_iterator):
-                if self.prepruning_finetune_steps > 0 and self.global_step == self.prepruning_finetune_steps:
+                if self.prepruning_finetune_steps > 0 and self.global_step == self.prepruning_finetune_steps: #! before pruning, run 12272 steps
                     self.start_prune = True
 
                     self.optimizer = None
@@ -277,8 +279,8 @@ class CoFiTrainer(Trainer):
                     logger.info("Starting l0 regularization!")
 
                 if self.start_prune:
-                    zs = self.l0_module.forward(training=True)
-                    self.fill_inputs_with_zs(zs, inputs)
+                    zs = self.l0_module.forward(training=True) #! get the zs
+                    self.fill_inputs_with_zs(zs, inputs) #! use the zs
 
                 loss_terms = self.training_step(model, inputs)
                 tr_loss_step = loss_terms["loss"]
@@ -358,6 +360,7 @@ class CoFiTrainer(Trainer):
                     break
 
             epoch_end = time.time()
+            # wandb.log({'epoch':epoch})
             logger.info(
                 f"Epoch {epoch} finished. Took {round(epoch_end - epoch_start, 2)} seconds.")
 
@@ -373,6 +376,7 @@ class CoFiTrainer(Trainer):
             # Clean the state at the end of training
             delattr(self, "_past")
 
+        # wandb.log({'global_step':self.global_step,'training_loss':tr_loss.item() / self.global_step})
         return TrainOutput(self.global_step, tr_loss.item() / self.global_step, None)
 
     def prediction_loop(self, dataloader: DataLoader, description: str, prediction_loss_only: Optional[bool] = None) -> PredictionOutput:
@@ -422,7 +426,7 @@ class CoFiTrainer(Trainer):
             if zs is not None:
                 if ii == 0:
                     logger.info(f"Putting zs {zs.keys()} into inputs:")
-                self.fill_inputs_with_zs(zs, inputs)
+                self.fill_inputs_with_zs(zs, inputs) #! use the zs
             loss, logits, labels = self.prediction_step(
                 model, inputs, prediction_loss_only)
 
@@ -498,6 +502,7 @@ class CoFiTrainer(Trainer):
             eval_dataloader, description="Evaluation")
 
         self.log(output.metrics)
+        # wandb.log(output.metrics)
         output.metrics["step"] = self.global_step
 
         logger.info(f"Evaluating: {output.metrics}")
@@ -545,7 +550,7 @@ class CoFiTrainer(Trainer):
 
     def calculate_layer_distillation_loss(self, teacher_outputs, student_outputs, zs):
         mse_loss = torch.nn.MSELoss(reduction="mean")
-        if self.additional_args.do_layer_distill:
+        if self.additional_args.do_layer_distill: #! only do layer distill
             mlp_z = None
             head_layer_z = None
             if "mlp_z" in zs:
@@ -553,8 +558,8 @@ class CoFiTrainer(Trainer):
             if "head_layer_z" in zs:
                 head_layer_z = zs["head_layer_z"].detach().cpu()
 
-            teacher_layer_output = teacher_outputs[2][1:]
-            student_layer_output = student_outputs[2][1:]
+            teacher_layer_output = teacher_outputs[2][1:] #! hidden states, with a length of 12. Every has a shape of [32, 65, 768]
+            student_layer_output = student_outputs[2][1:] 
 
             # distilliting existing layers
             if self.additional_args.layer_distill_version == 2:
@@ -571,14 +576,14 @@ class CoFiTrainer(Trainer):
                 transformed_s_layer_o = [self.model.layer_transformation(
                     s_layer_o) for s_layer_o in student_layer_output]
                 specified_teacher_layer_reps = [
-                    teacher_layer_output[i] for i in specified_teacher_layers]
+                    teacher_layer_output[i] for i in specified_teacher_layers] #! teacher: 4x[32,113,768]
 
                 device = transformed_s_layer_o[0].device
                 for t_layer_o in specified_teacher_layer_reps:
-                    for i, s_layer_o in enumerate(transformed_s_layer_o):
+                    for i, s_layer_o in enumerate(transformed_s_layer_o): #! student: 12x[32,113,768]
                         l.append(mse_loss(t_layer_o, s_layer_o))
                 layerwiseloss = torch.stack(l).reshape(
-                    len(specified_teacher_layer_reps), len(student_layer_output))
+                    len(specified_teacher_layer_reps), len(student_layer_output)) #! [4,12]
 
                 existing_layers = None
                 if head_layer_z is not None:
@@ -586,10 +591,10 @@ class CoFiTrainer(Trainer):
                     existing_layers = existing_layers.to(layerwiseloss.device)
 
                 layer_loss = 0
-                # no ordering restriction specified
+                #! no ordering restriction specified
                 if self.additional_args.layer_distill_version == 3:
                     alignment = torch.argmin(layerwiseloss, dim=1)
-                # added the ordering restriction
+                #! added the ordering restriction -> to choose the min loss in 4 student layers
                 elif self.additional_args.layer_distill_version == 4:
                     last_aligned_layer = 12
                     alignment = []
@@ -614,7 +619,7 @@ class CoFiTrainer(Trainer):
                     sys.exit()
 
                 layerwise = torch.arange(4).to(device)
-                layer_loss += layerwiseloss[layerwise, alignment].sum()
+                layer_loss += layerwiseloss[layerwise, alignment].sum() #! layerwise: teacher (specified layers) / alignment: student (min loss layers) / layerwiseloss: [4,12]
                 if self.global_step % 100 == 0:
                     logger.info(f"v{self.additional_args.layer_distill_version} Global step: {self.global_step}, Alignment: " + str(alignment))
             return layer_loss
@@ -627,9 +632,9 @@ class CoFiTrainer(Trainer):
 
         ce_distill_loss = F.kl_div(
             input=F.log_softmax(
-                student_outputs[1] / self.additional_args.distill_temp, dim=-1),
+                student_outputs[1] / self.additional_args.distill_temp, dim=-1), #! logits: [32,3]
             target=F.softmax(
-                teacher_outputs[1] / self.additional_args.distill_temp, dim=-1),
+                teacher_outputs[1] / self.additional_args.distill_temp, dim=-1), #! distill_temp: 2.0
             reduction="batchmean") * (self.additional_args.distill_temp ** 2)
 
         loss = self.additional_args.distill_ce_loss_alpha * ce_distill_loss
@@ -644,6 +649,7 @@ class CoFiTrainer(Trainer):
         inputs["attention_mask"] = inputs["attention_mask"][:, :max_length]
         if "token_type_ids" in inputs:
             inputs["token_type_ids"] = inputs["token_type_ids"][:, :max_length]
+
 
     def training_step(self, model: torch.nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> List[torch.Tensor]:
         model.train()
@@ -663,9 +669,9 @@ class CoFiTrainer(Trainer):
                 self.shortens_inputs(teacher_inputs)
                 teacher_outputs = self.teacher_model(**teacher_inputs)
             self.shortens_inputs(inputs)
-            student_outputs = model(**inputs)
+            student_outputs = model(**inputs) #! get the two outputs
 
-            zs = {key: inputs[key] for key in inputs if "_z" in key}
+            zs = {key: inputs[key] for key in inputs if "_z" in key} #! extract the zs
             distill_loss, distill_ce_loss, loss = self.calculate_distillation_loss(
                 teacher_outputs, student_outputs, zs)
         else:
@@ -682,6 +688,12 @@ class CoFiTrainer(Trainer):
             loss = loss / self.args.gradient_accumulation_steps
 
         loss.backward()
+        
+        # wandb.log({"loss": loss.detach(),
+        #         "lagrangian_loss": lagrangian_loss.detach() if lagrangian_loss is not None else None,
+        #         "distill_layer_loss": distill_loss.detach() if distill_loss is not None else None,
+        #         "distill_ce_loss": distill_ce_loss.detach() if distill_ce_loss is not None else None})
+        
         return {"loss": loss.detach(),
                 "lagrangian_loss": lagrangian_loss.detach() if lagrangian_loss is not None else None,
                 "distill_layer_loss": distill_loss.detach() if distill_loss is not None else None,

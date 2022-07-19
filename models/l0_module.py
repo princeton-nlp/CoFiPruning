@@ -97,7 +97,7 @@ class L0Module(Module):
             self.initialize_whole_mlp()
             self.initialized_layer_structured_heads()
             
-    def add_one_module(self, z_loga, type, parameter_per_dim, size, shape):
+    def add_one_module(self, z_loga, type, parameter_per_dim, size, shape): #! init the z_logas
         self.types.append(type)
         self.z_logas[type] = z_loga
         self.parameters_per_dim[type] = parameter_per_dim
@@ -212,7 +212,7 @@ class L0Module(Module):
         num_parameters = torch.sum(intlayer_score * int_score) * self.parameters_per_dim["intermediate"]
         return num_parameters
 
-    def get_num_parameters_and_constraint_for_hidden(self):
+    def get_num_parameters_and_constraint_for_hidden(self): #! calculate the current parsity
         num_parameters = 0
        
         # 12 * 1 * 1
@@ -261,15 +261,15 @@ class L0Module(Module):
     def lagrangian_regularization(self, pruned_steps):
         target_sparsity = self.target_sparsity
         if "hidden" in self.types:
-            expected_size = self.get_num_parameters_and_constraint_for_hidden()
+            expected_size = self.get_num_parameters_and_constraint_for_hidden() #! calculate \bar s
         else:
-            expected_size = self.get_num_parameters_and_constraint()
+            expected_size = self.get_num_parameters_and_constraint() #! calculate \bar s
         expected_sparsity = 1 - expected_size / self.prunable_model_size
         if self.lagrangian_warmup > 0:
             target_sparsity = self.get_target_sparsity(pruned_steps)
-        lagrangian_loss = (
+        lagrangian_loss = ( #! see appendix
                 self.lambda_1 * (expected_sparsity - target_sparsity)
-                + self.lambda_2 * (expected_sparsity - target_sparsity) ** 2
+                + self.lambda_2 * (expected_sparsity - target_sparsity) ** 2 #! where is the lambda 1 and lambda 2 from
         )
         return lagrangian_loss, expected_sparsity, target_sparsity
 
@@ -342,17 +342,18 @@ class L0Module(Module):
         results["pruned_params"] = pruned_model_size
         results["remaining_params"] = remaining_model_size
         results["pruned_model_sparsity"] = pruned_model_size / self.prunable_model_size
+        
+        logger.info(f"remaining_head_layers: {head_layer_z}")
+        logger.info(f"remaining_mlp_layers: {mlp_z}")
+        logger.info(f"remaining_hidden_dims: {remaining_hidden_dims}")
+        logger.info(f"remaining_intermediate_nums: {remaining_intermediate_nums}")
+        logger.info(f"remaining_head_nums: {remaining_head_nums}")
+        logger.info(f"pruned_model_size: {pruned_model_size}")
+        logger.info(f"remaining_model_size: {remaining_model_size}")
 
         return results
 
-        # logger.info(f"remaining_head_layers: {head_layer_z}")
-        # logger.info(f"remaining_mlp_layers: {mlp_z}")
-        # logger.info(f"remaining_hidden_dims: {remaining_hidden_dims}")
-        # logger.info(f"remaining_intermediate_nums: {remaining_intermediate_nums}")
-        # logger.info(f"remaining_head_nums: {remaining_head_nums}")
-        # logger.info(f"pruned_model_size: {pruned_model_size}")
-        # logger.info(f"remaining_model_size: {remaining_model_size}")
-
+        
 
     def forward(self, training=True,):
         zs = {f"{type}_z": [] for type in self.types}

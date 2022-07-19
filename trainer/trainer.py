@@ -113,7 +113,7 @@ class CoFiTrainer(Trainer):
         logging.set_verbosity(log_level)
         logger.setLevel(log_level)
 
-    def create_optimizer_and_scheduler(self, num_training_steps: int):
+    def create_optimizer_and_scheduler(self, num_training_steps: int, build_l0_optimizer:bool=True):
         def log_params(param_groups, des):
             for i, grouped_parameters in enumerate(param_groups):
                 logger.info(
@@ -142,7 +142,7 @@ class CoFiTrainer(Trainer):
                 eps=self.args.adam_epsilon,
             )
 
-            if self.l0_module is not None:
+            if build_l0_optimizer and self.l0_module is not None:
                 l0_params = [{
                     "params": [p for n, p in self.l0_module.named_parameters() if "lambda" not in n],
                     "weight_decay": 0.0,
@@ -197,7 +197,7 @@ class CoFiTrainer(Trainer):
             num_train_epochs = self.args.num_train_epochs
             self.args.max_steps = self.t_total
 
-        self.create_optimizer_and_scheduler(num_training_steps=self.t_total)
+        self.create_optimizer_and_scheduler(num_training_steps=self.t_total, build_l0_optimizer = self.start_prune)
 
         model = self.model
 
@@ -275,7 +275,7 @@ class CoFiTrainer(Trainer):
                     lr_steps = self.t_total - self.global_step
 
                     # reset the optimizer
-                    self.create_optimizer_and_scheduler(lr_steps)
+                    self.create_optimizer_and_scheduler(lr_steps, self.start_prune)
                     logger.info("Starting l0 regularization!")
 
                 if self.start_prune:

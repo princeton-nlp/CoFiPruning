@@ -3,3 +3,5 @@ scipy==1.7.3
 datasets
 scikit-learn==1.0.2
 torch==1.10.2
+black
+wandb

@@ -1,4 +1,3 @@
-from black import main
 import torch
 import os
 from transformers.modeling_utils import prune_linear_layer
@@ -37,7 +36,7 @@ def load_model(model_path, model_class, zs=None, num_labels=2):
     if zs is not None:
         model = load_model_with_zs(model_path, model_class, zs)
     else:
-        # only and task name and model weights are accessible 
+        # only and task name and model weights are accessible
         model = load_pruned_model(model_path, model_class)
         print(f"Model Size: {calculate_parameters(model)}")
     return model
@@ -58,7 +57,7 @@ def update_params(model, zs):
     hidden_dims = config.hidden_size
     num_heads = config.num_attention_heads
     dims_per_head = hidden_dims // num_heads
-    num_layers = config.num_hidden_layers 
+    num_layers = config.num_hidden_layers
 
     if zs is not None:
         if "intermediate_z" in zs:
@@ -109,7 +108,7 @@ def prune_model_with_z(zs, model):
     if zs is None:
         return None, None
     bert = model.bert if hasattr(model, "bert") else model.roberta
-   
+
     if "head_z" in zs:
         head_z = zs.get("head_z", None)
         head_layer_z = zs.get("head_layer_z", None)
@@ -121,7 +120,7 @@ def prune_model_with_z(zs, model):
                 head_z_layer *= head_layer_z[layer]
             index = torch.where(head_z_layer == 0)[0].tolist()
             prune_heads[layer] = index
-        
+
             print(f"Layer {layer}, heads {' '.join([str(i) for i in index])} pruned.")
         model.prune_heads(prune_heads)
 
@@ -152,7 +151,7 @@ def prune_model_with_z(zs, model):
         hidden_zs = zs["hidden_z"]
         index = torch.LongTensor(hidden_zs.squeeze().nonzero().squeeze().tolist())
         index = index.to(model.device)
-        
+
         bert.embeddings.word_embeddings.weight = torch.nn.parameter.Parameter(
             bert.embeddings.word_embeddings.weight.index_select(1, index).clone().detach())
         bert.embeddings.word_embeddings.embedding_dim = index.shape[0]
@@ -182,7 +181,7 @@ def prune_model_with_z(zs, model):
                 bert.encoder.layer[layer].output.dense = \
                     prune_layer( bert.encoder.layer[layer].output.dense, index, dim=0)
                 prune_layer_norm(bert.encoder.layer[layer].output.LayerNorm, index)
-        
+
         # accommodate for different models
         if hasattr(model, "classifier"):
             if hasattr(model.classifier, "dense"):
@@ -223,7 +222,7 @@ def prune_model_with_z(zs, model):
             print("down:", bert.encoder.layer[layer].output.dense.weight.shape)
         else:
             print("up", None)
-            print("down", None) 
+            print("down", None)
 
 
 def prune_intermediate_layers(model, keep_dims):
@@ -236,7 +235,7 @@ def prune_intermediate_layers(model, keep_dims):
         else:
             bert.encoder.layer[layer].intermediate.dense = prune_linear_layer(bert.encoder.layer[layer].intermediate.dense, index=torch.LongTensor(keep_dims[layer]).to(device), dim=0)
             bert.encoder.layer[layer].output.dense = prune_linear_layer(bert.encoder.layer[layer].output.dense, index=torch.LongTensor(keep_dims[layer]).to(device), dim=1)
-      
+
 
 def load_zs(model_path):
     if model_path.endswith("zs.pt"):
@@ -261,17 +260,17 @@ def load_pruned_model(model, weights):
 
     architecture = config.architectures[0].lower()
     bert_name = "roberta" if "roberta" in architecture else "bert"
-    
+
     hidden_z = torch.zeros(config.hidden_size)
     hidden_z[:weights[f"{bert_name}.embeddings.word_embeddings.weight"].shape[1]] = 1
     zs["hidden_z"] = hidden_z
 
-    head_z = torch.zeros(config.num_hidden_layers, config.num_attention_heads)    
+    head_z = torch.zeros(config.num_hidden_layers, config.num_attention_heads)
     head_layer_z = torch.zeros(config.num_hidden_layers)
     for i in range(config.num_hidden_layers):
         key = f"{bert_name}.encoder.layer.{i}.attention.output.dense.weight"
         if key in weights:
-            remaining_heads = weights[key].shape[-1] // dim_per_head 
+            remaining_heads = weights[key].shape[-1] // dim_per_head
             head_z[i, :remaining_heads] = 1
             head_layer_z[i] = 1
     zs["head_z"] = head_z
@@ -282,18 +281,18 @@ def load_pruned_model(model, weights):
     for i in range(config.num_hidden_layers):
         key = f"bert.encoder.layer.{i}.output.dense.weight"
         if key in weights:
-            remaining_int_dims = weights[key].shape[-1] 
+            remaining_int_dims = weights[key].shape[-1]
             int_z[i, :remaining_int_dims] = 1
             mlp_z[i] = 1
     zs["intermediate_z"] = int_z
     zs["mlp_z"] = mlp_z
-    
-    prune_model_with_z(zs, model)    
+
+    prune_model_with_z(zs, model)
     model.load_state_dict(weights, strict=False)
     return model
 
 def get_full_model_size(model_class, model_name):
-    model = model_class.from_pretrained(model_name) 
+    model = model_class.from_pretrained(model_name)
     model_size = calculate_parameters(model)
     return model_size
 

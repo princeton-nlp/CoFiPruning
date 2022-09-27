@@ -86,7 +86,7 @@ def evaluate(model):
     if task_name in ["rte", "stsb", "cola", "mrpc"]:
         t = 20
     assert t > 1
-    
+
     total_examples = 0
     for i in range(t):
         _remove_unused_columns(dataset, "evaluation")
@@ -110,7 +110,7 @@ def evaluate(model):
                 b = time.time()
                 total_infer_time += (b-a)
                 if i == 0:
-                    total_examples += len(logits[0])
+                    total_examples += len(logits)
                     preds = logits if preds is None else nested_concat(
                         preds, logits)
                     label_ids = labels if label_ids is None else nested_concat(

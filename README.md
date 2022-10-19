@@ -68,6 +68,9 @@ In the following section, we provide instructions on training CoFi with our code
 
 Try runing the following script to install the dependencies.
 
+Please define a lower version of transformers, because the latest version seems seems do not have `hf_bucket_url` in `transformers.file_utils` 
+
+
 ```bash
 pip install -r requirements.txt
 ```

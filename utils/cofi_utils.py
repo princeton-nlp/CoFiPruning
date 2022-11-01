@@ -32,13 +32,10 @@ def load_model_with_zs(model_path, model_class, zs=None):
     print(f"Model Size after pruning: {calculate_parameters(model)}")
     return model
 
-def load_model(model_path, model_class, zs=None, num_labels=2):
-    if zs is not None:
-        model = load_model_with_zs(model_path, model_class, zs)
-    else:
-        # only and task name and model weights are accessible
-        model = load_pruned_model(model_path, model_class)
-        print(f"Model Size: {calculate_parameters(model)}")
+def load_model(model_path, model_class, zs=None):
+    assert zs is not None
+    model = load_model_with_zs(model_path, model_class, zs)
+    print(f"Model Size: {calculate_parameters(model)}")
     return model
 
 # load the l0 module

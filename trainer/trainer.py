@@ -548,7 +548,7 @@ class CoFiTrainer(Trainer):
 
         self.model.save_pretrained(output_dir)
 
-        def calculate_layer_distillation_loss(self, teacher_outputs, student_outputs, zs):
+    def calculate_layer_distillation_loss(self, teacher_outputs, student_outputs, zs):
         mse_loss = torch.nn.MSELoss(reduction="mean")
         if self.additional_args.do_layer_distill: #! only do layer distill
             mlp_z = None

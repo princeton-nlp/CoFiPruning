@@ -92,7 +92,7 @@ We provide example training scripts for training with CoFiPruning with different
 - `--distillation_path`: the directory of the teacher model
 - `--distillation_layer_loss_alpha`: weight for layer distillation
 - `--distillation_ce_loss_alpha`: weight for cross entropy distillation
-- `--layer_distill_version`: we recommend using version 4 for small-sized datasets to impose an explicit restriction on layer orders but for relatively larger datasets, version 3 and version 4 do not make much difference.
+- `--layer_distill_version`: we recommend using version 4 for small-sized datasets to impose an explicit restriction on layer orders but for relatively larger datasets, version 3 and version 4 do not make much difference. @zhangzhenyu13 found that randomly selecting teacher layers leads to more stable results, which is version 6. Please find [this pull request](https://github.com/princeton-nlp/CoFiPruning/pull/35) for more details.
 - `--sparsity_epsilon`: the epsilon to relax the sparsity constraint. If set to be larger than 0, the training process will start saving models with a sparsity `target_sparsity - sparsity_epislon`. This is recommended to be set to be 0.01 when training with 0.95 sparsity to replicate our reported numbers, so that the models with a sparsity above 0.94 will be saved.
 
 After pruning the model, the same script could be used for further fine-tuning the pruned model with following arguments:

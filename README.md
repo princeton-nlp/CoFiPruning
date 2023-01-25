@@ -1,6 +1,6 @@
 ## ☕ CoFiPruning: Structured Pruning Learns Compact and Accurate Models
 
-This repository contains the code and pruned models for our ACL'22 paper [Structured Pruning Learns Compact and Accurate Models](https://arxiv.org/pdf/2204.00408.pdf). Our talk slides can be found [here](https://github.com/princeton-nlp/CoFiPruning/blob/main/ACL2022_talk.pdf).
+This repository contains the code and pruned models for our ACL'22 paper [Structured Pruning Learns Compact and Accurate Models](https://arxiv.org/pdf/2204.00408.pdf). Our talk slides can be found [here](https://github.com/princeton-nlp/CoFiPruning/blob/main/ACL2022_talk.pdf). Numerical results in the paper can be found [here](https://docs.google.com/spreadsheets/d/1IF6ReWkSDKnZomvQT9GBlEhfN48NoDyr-XHOvD2vjvs/edit#gid=0). 
 
 **************************** **Updates** ****************************
 

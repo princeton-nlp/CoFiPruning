@@ -30,7 +30,7 @@ class L0Module(Module):
         self.pruning_type = pruning_type
 
         self.hidden_size = config.hidden_size
-        self.intermediate_size = config.intermediate_size 
+        self.intermediate_size = getattr(config, "intermediate_size", config.ffn_dim)
         self.num_attention_heads = config.num_attention_heads
         self.mlp_num_per_layer = 1
         self.dim_per_head = self.hidden_size // self.num_attention_heads 
@@ -39,7 +39,6 @@ class L0Module(Module):
 
         self.params_per_head_layer = self.hidden_size * self.hidden_size * 4 + self.hidden_size * 4
         self.params_per_head =  self.params_per_head_layer // self.num_attention_heads
-        
 
         self.params_per_mlp_layer = self.hidden_size * self.intermediate_size * 2 + self.hidden_size + self.hidden_size * 4
         self.params_per_intermediate_dim = self.params_per_mlp_layer // self.intermediate_size
@@ -354,7 +353,6 @@ class L0Module(Module):
         return results
 
         
-
     def forward(self, training=True,):
         zs = {f"{type}_z": [] for type in self.types}
 

@@ -226,7 +226,7 @@ class CoFiBertSelfOutput(BertSelfOutput):
         # when head_z.sum() == 0, the hidden_states != 0 bc of bias in self.dense 
         hidden_states = self.dense(hidden_states)
         if head_layer_z is not None:
-            hidden_states = self.dense(hidden_states)
+            hidden_states = hidden_states.mul(head_layer_z)
         
         # keep head_layer_z in the computation graph to possibly revert the mask 
         if head_layer_z.sum().eq(0).item():

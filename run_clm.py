@@ -17,6 +17,7 @@ from transformers import (
     set_seed,
 )
 
+from transformers.trainer import Trainer
 import logging
 
 from transformers.trainer_utils import get_last_checkpoint
@@ -33,6 +34,7 @@ import logging
 from models.l0_module import L0Module
 from models.modeling_opt import CoFiOPTForCausalLM
 from cus_data.load_data_hf import load_raw_dataset, preprocess_datasets, load_preprocessed_datasets
+from cus_data.dataloader import group_texts
 from cus_data.data_mapping import get_metric_mapping
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -85,6 +87,7 @@ def main():
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
+    logger.info(f"Additional arguments {additional_args}")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -178,6 +181,7 @@ def main():
                              droprate_init=additional_args.droprate_init,
                              target_sparsity=additional_args.target_sparsity,
                              pruning_modules=additional_args.pruning_modules)
+        model.l0_module = l0_module
 
     # load_datasets
     if len(additional_args.preprocessed_train_files) > 0:
@@ -193,6 +197,10 @@ def main():
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
+        
+        # hack to regroup the preprocessed datasets to satisfy the block_size constraint
+        if data_args.block_size > len(lm_datasets["train"][0]["input_ids"]):
+            train_dataset = train_dataset.map(lambda x: group_texts(x, data_args.block_size), batched=True, batch_size=1000, num_proc=4)
         log_dataset(train_dataset, "train")
 
     if training_args.do_eval:
@@ -206,6 +214,9 @@ def main():
                     eval_dataset[key] = lm_datasets[key].select(range(max_eval_samples))
                 else:
                     eval_dataset[key] = lm_datasets[key]
+                
+                if data_args.block_size > len(eval_dataset[key][0]["input_ids"]):
+                    eval_dataset[key] = eval_dataset[key].map(lambda x: group_texts(x, data_args.block_size), batched=True, batch_size=1000, num_proc=4)
 
         log_dataset(eval_dataset, "eval")
         
@@ -245,10 +256,12 @@ def main():
         data_collator=default_data_collator,
         compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
-        l0_module=l0_module,
+        # l0_module=l0_module,
         teacher_model=teacher_model,
         additional_args=additional_args
     )
+
+    # trainer = Trainer(model=model, args=training_args, train_dataset=train_dataset, eval_dataset=eval_dataset, tokenizer=tokenizer, data_collator=default_data_collator, compute_metrics=compute_metrics, preprocess_logits_for_metrics=preprocess_logits_for_metrics)
 
     # Training
     if training_args.do_train:
@@ -284,18 +297,20 @@ def main():
         logger.info("*** Evaluate ***")
 
         if isinstance(eval_dataset, dict):
+            final_metrics = {}
             for eval_dataset_name, d in eval_dataset.items():
                 metrics = trainer.evaluate(
                     eval_dataset=d,
                     metric_key_prefix=f"eval_{eval_dataset_name}")
+                final_metrics[eval_dataset_name] = metrics
         else:
-            metrics = trainer.evaluate()
+            final_metrics = trainer.evaluate()
 
         for key in eval_dataset:
-            metrics[key + "_eval_samples"] = len(eval_dataset[key])
+            final_metrics[key + "_eval_samples"] = len(eval_dataset[key])
 
         # trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
+        trainer.save_metrics("eval", final_metrics)
 
 
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}

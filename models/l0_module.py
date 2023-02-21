@@ -264,11 +264,14 @@ class L0Module(Module):
         else:
             expected_size = self.get_expected_num_params() #! calculate \bar s
         expected_sparsity = 1 - expected_size / self.prunable_model_size
-        
+         
         lagrangian_loss = ( #! see appendix
                 self.lambda_1 * (expected_sparsity - target_sparsity)
                 + self.lambda_2 * (expected_sparsity - target_sparsity) ** 2 
         )
+
+        if lagrangian_loss.isnan().any():
+            import pdb; pdb.set_trace()
         return lagrangian_loss, expected_sparsity, target_sparsity
  
 

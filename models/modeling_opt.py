@@ -311,7 +311,7 @@ class CoFiOPTAttention(OPTAttention):
         if head_layer_z is not None:
             attn_output *= head_layer_z
         #######################
-
+        
         return attn_output, attn_weights_reshaped, past_key_value
     
 

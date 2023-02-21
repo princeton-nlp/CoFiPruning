@@ -177,24 +177,27 @@ class CoFiTrainer(Trainer):
     ):
         Trainer.__init__(self, model, args, data_collator, train_dataset, eval_dataset, tokenizer, model_init, compute_metrics, callbacks, optimizers, preprocess_logits_for_metrics)
         
-        self.l0_module = l0_module
+        # self.l0_module = l0_module
         self.teacher_model = teacher_model
         self.additional_args = additional_args
         self.current_stage = None
+         
+        self.l0_module = model.l0_module
         
-        self.l0_module.cuda()
-        
+        self.l0_optimizer = None
+        self.lag_optimizer = None
 
-    def create_optimizer_and_scheduler(self, num_training_steps: int):
-        """
-        Setup the optimizer and the learning rate scheduler.
-        We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
-        Trainer's init through `optimizers`, or subclass and override this method (or `create_optimizer` and/or
-        `create_scheduler`) in a subclass.
-        """
+        if self.args.fp16:
+            self.scaler = torch.cuda.amp.GradScaler(init_scale=2**5)
+
+    def create_optimizer_and_scheduler(self, num_training_steps: int, l0_num_training_steps: int = 0):
         self.create_optimizer()
         if self.optimizer is not None:
-            self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.optimizer)
+            self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.optimizer, lr_scheduler_type=self.args.lr_scheduler_type)
+        if self.l0_optimizer is not None:
+            self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.l0_optimizer, scheduler_name="l0_lr_scheduler", lr_scheduler_type=self.additional_args.l0_lr_scheduler_type)
+        if self.lag_optimizer is not None:
+            self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.lag_optimizer, scheduler_name="lag_lr_scheduler", lr_scheduler_type=self.additional_args.l0_lr_scheduler_type)
 
     def create_optimizer(self):
         opt_model = self.model_wrapped if is_sagemaker_mp_enabled() else self.model
@@ -205,21 +208,23 @@ class CoFiTrainer(Trainer):
                 
         if self.optimizer is None:
             layer_norm_types = (torch.nn.LayerNorm, CoFiLayerNorm)
+            all_model_names = [n for n, _ in opt_model.named_parameters()]
+            all_model_names = [n for n in all_model_names if "l0_module" not in n] # exclude l0_module parameters
+
             decay_param_names = get_parameter_names(opt_model, layer_norm_types) # it's to get parameters that are not in layer_norm_types
+            decay_param_names = [n for n in decay_param_names if "l0_module" not in n]
             decay_param_names = [name for name in decay_param_names if "bias" not in name]
-            no_decay_param_names = [n for n, p in opt_model.named_parameters() if n not in decay_param_names]
+            no_decay_param_names = [n for n in all_model_names if n not in decay_param_names]
             
             embedding_names = ["embed", "lm_head"]
-            embedding_param_names = [n for n, _ in opt_model.named_parameters() if any(embed_name in n for embed_name in embedding_names)]
+            embedding_param_names = [n for n in all_model_names if any(embed_name in n for embed_name in embedding_names)]
             
             if self.additional_args.freeze_embeddings:
                 decay_param_names = set(decay_param_names) - set(embedding_param_names)
             
             decay_parameters = [p for n, p in opt_model.named_parameters() if n in decay_param_names]
             no_decay_parameters = [p for n, p in opt_model.named_parameters() if n in no_decay_param_names]
-
-            weight_decay_params = [p for n, p in opt_model.named_parameters() if n in decay_parameters]
-                
+               
             optimizer_grouped_parameters = [
                 {
                     "params": decay_parameters,
@@ -253,7 +258,7 @@ class CoFiTrainer(Trainer):
                 l0_optimizer_cls, l0_optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(l0_args)
                 self.l0_optimizer = l0_optimizer_cls(l0_params, **l0_optimizer_kwargs)
             
-            if getattr(self, "lagrangian_optimizer", None) is None:
+            if getattr(self, "lag_optimizer", None) is None:
                 lagrangian_params = [{
                     "params": [p for n, p in self.l0_module.named_parameters() if "lambda" in n],
                     "weight_decay": 0.0,
@@ -261,10 +266,21 @@ class CoFiTrainer(Trainer):
                 }]
                 log_params(lagrangian_params, "l0 lagrangian params")
                 lagrangian_optimizer_cls, lagrangian_optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(lagrangian_args)
-                self.lagrangian_optimizer = lagrangian_optimizer_cls(lagrangian_params, **lagrangian_optimizer_kwargs)
+                self.lag_optimizer = lagrangian_optimizer_cls(lagrangian_params, **lagrangian_optimizer_kwargs)
 
-        return self.optimizer, self.l0_optimizer, self.lagrangian_optimizer
+        return self.optimizer, self.l0_optimizer, self.lag_optimizer
 
+    def create_scheduler(self, num_training_steps: int, optimizer: torch.optim.Optimizer = None, scheduler_name: str = "lr_scheduler", lr_scheduler_type: str = None):
+        if lr_scheduler_type is None:
+            return 
+        if getattr(self, scheduler_name, None) is None:
+            scheduler = get_scheduler(
+                lr_scheduler_type,
+                optimizer=optimizer,
+                num_warmup_steps=self.args.get_warmup_steps(num_training_steps),
+                num_training_steps=num_training_steps,
+            )
+            setattr(self, scheduler_name, scheduler)
     
     def calculate_pruning_steps(self,  num_update_steps_per_epoch):
         self.prepruning_finetune_steps = int(self.additional_args.prepruning_finetune_epochs * num_update_steps_per_epoch)
@@ -273,11 +289,14 @@ class CoFiTrainer(Trainer):
         self.final_finetune_steps = int(self.additional_args.final_finetune_epochs * num_update_steps_per_epoch)
         if self.l0_module is not None:
             self.l0_module.lagrangian_warmup_steps = self.lagrangian_warmup_steps        
+        self.l0_max_steps = self.lagrangian_warmup_steps + self.joint_training_steps
     
+    def print_pruning_steps(self):
         print("  prepruning_finetune: {} epochs, {} steps".format(self.additional_args.prepruning_finetune_epochs, self.prepruning_finetune_steps))
         print("  lagrangian_warmup: {} epochs, {} steps".format(self.additional_args.lagrangian_warmup_epochs, self.lagrangian_warmup_steps))
         print("  joint_training: {} epochs, {} steps".format(self.additional_args.joint_training_epochs, self.joint_training_steps))
         print("  final_finetune: {} epochs, {} steps".format(self.additional_args.final_finetune_epochs, self.final_finetune_steps))
+        print("  l0_max_steps: {} steps".format(self.l0_max_steps))
 
     
 
@@ -325,6 +344,8 @@ class CoFiTrainer(Trainer):
                 f" {args.max_steps}"
             )
 
+        self.calculate_pruning_steps(num_update_steps_per_epoch)
+        
         if DebugOption.UNDERFLOW_OVERFLOW in self.args.debug:
             if self.args.n_gpu > 1:
                 # nn.DataParallel(model) replicates the model, creating new variables and module
@@ -352,7 +373,7 @@ class CoFiTrainer(Trainer):
             self.optimizer = optimizer
             self.lr_scheduler = lr_scheduler
         elif not delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps, l0_num_training_steps=self.l0_max_steps)
 
         self.state = TrainerState()
         self.state.is_hyper_param_search = trial is not None
@@ -371,7 +392,7 @@ class CoFiTrainer(Trainer):
             self.model_wrapped = model
 
         if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps, l0_num_training_steps=self.l0_max_steps)
 
         # Check if saved optimizer or scheduler states exist
         self._load_optimizer_and_scheduler(resume_from_checkpoint)
@@ -393,7 +414,7 @@ class CoFiTrainer(Trainer):
         )
         
         # added for pruning # 
-        self.calculate_pruning_steps(num_update_steps_per_epoch)
+        self.print_pruning_steps()
         ####################
 
         self.state.epoch = 0
@@ -550,8 +571,6 @@ class CoFiTrainer(Trainer):
                     else:
                         tr_lag_loss += tr_lag_loss_step
                 
-                print(tr_lag_loss_step)
-
                 
                 # TODO: consider adding the part for L0 regularization
                 self.current_flos += float(self.floating_point_ops(inputs))
@@ -565,48 +584,44 @@ class CoFiTrainer(Trainer):
                     steps_in_epoch <= args.gradient_accumulation_steps
                     and (step + 1) == steps_in_epoch
                 ):
+                    stage = self.get_training_stage(eval=False)
+
                     # Gradient clipping
                     if args.max_grad_norm is not None and args.max_grad_norm > 0 and not self.deepspeed:
                         # deepspeed does its own clipping
 
                         if self.do_grad_scaling:
-                            # Reduce gradients first for XLA
-                            if is_torch_tpu_available():
-                                gradients = xm._fetch_gradients(self.optimizer)
-                                xm.all_reduce("sum", gradients, scale=1.0 / xm.xrt_world_size())
                             # AMP: gradients need unscaling
-                            self.scaler.unscale_(self.optimizer)
-
-                        if is_sagemaker_mp_enabled() and args.fp16:
-                            self.optimizer.clip_master_grads(args.max_grad_norm)
-                        elif hasattr(self.optimizer, "clip_grad_norm"):
+                            if not self.additional_args.freeze_main_model:
+                                self.scaler.unscale_(self.optimizer)
+                            if self.l0_optimizer is not None:
+                                if stage == "jt" or stage == "lw":
+                                    self.scaler.unscale_(self.l0_optimizer)
+                                    self.scaler.unscale_(self.lag_optimizer)
+                        
+                        if hasattr(self.optimizer, "clip_grad_norm"):
                             # Some optimizers (like the sharded optimizer) have a specific way to do gradient clipping
-                            self.optimizer.clip_grad_norm(args.max_grad_norm)
+                            if not self.additional_args.freeze_main_model:
+                                self.optimizer.clip_grad_norm(args.max_grad_norm)
+                            if self.l0_optimizer is not None:
+                                if stage == "jt" or stage == "lw":
+                                    self.l0_optimizer.clip_grad_norm(args.max_grad_norm)
+                                    self.lag_optimizer.clip_grad_norm(args.max_grad_norm)
                         elif hasattr(model, "clip_grad_norm_"):
                             # Some models (like FullyShardedDDP) have a specific way to do gradient clipping
                             model.clip_grad_norm_(args.max_grad_norm)
                         else:
                             # Revert to normal clipping otherwise, handling Apex or full precision
-                            nn.utils.clip_grad_norm_(
-                                amp.master_params(self.optimizer) if self.use_apex else model.parameters(),
-                                args.max_grad_norm,
-                            )
+                            nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
 
                     if not self.additional_args.freeze_main_model:
                         # Optimizer step
                         optimizer_was_run = True
-                        if self.deepspeed:
-                            pass  # called outside the loop
-                        elif is_torch_tpu_available():
-                            if self.do_grad_scaling:
-                                self.scaler.step(self.optimizer)
-                                self.scaler.update()
-                            else:
-                                xm.optimizer_step(self.optimizer)
-                        elif self.do_grad_scaling:
+                        if self.do_grad_scaling:
                             scale_before = self.scaler.get_scale()
                             self.scaler.step(self.optimizer)
-                            self.scaler.update()
+                            if stage != "lw" and stage != "jt":
+                                self.scaler.update()
                             scale_after = self.scaler.get_scale()
                             optimizer_was_run = scale_before <= scale_after
                         else:
@@ -615,19 +630,35 @@ class CoFiTrainer(Trainer):
                         if optimizer_was_run and not self.deepspeed:
                             self.lr_scheduler.step()
                     
-                    stage = self.get_training_stage(eval=False)
                     if self.l0_module is not None:
                         if stage == "lw" or stage == "jt":
-                            self.l0_optimizer.step()
-                            self.lagrangian_optimizer.step()
+                            optimizer_was_run = True
+                            if self.do_grad_scaling:
+                                scale_before = self.scaler.get_scale()
+                                self.scaler.step(self.l0_optimizer)
+                                self.scaler.step(self.lag_optimizer)
+                                self.scaler.update()
+                                scale_after = self.scaler.get_scale()
+                                optimizer_was_run = scale_before <= scale_after
+                            else:
+                                self.l0_optimizer.step()
+                                self.lag_optimizer.step()
+                            
                             self.l0_module.constrain_parameters()
+                            
+                            if getattr(self, "l0_lr_scheduler", None) is not None:
+                                if optimizer_was_run:
+                                    self.l0_lr_scheduler.step()
+                                    self.lag_lr_scheduler.step()
                         
                     model.zero_grad()
+                    if self.l0_module is not None:
+                        self.l0_module.zero_grad()
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
 
-                    self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+                    self._maybe_log_save_evaluate(tr_loss, tr_lag_loss, model, trial, epoch, ignore_keys_for_eval)
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
@@ -642,7 +673,7 @@ class CoFiTrainer(Trainer):
                 self.control.should_training_stop = True
 
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-            self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+            self._maybe_log_save_evaluate(tr_loss, tr_lag_loss, model, trial, epoch, ignore_keys_for_eval)
 
             if self.control.should_training_stop:
                 break
@@ -733,7 +764,8 @@ class CoFiTrainer(Trainer):
             pruning_re = calculate_model_size_with_z(zs, self.l0_module)
             target_sparsity = self.l0_module.get_target_sparsity(self.state.global_step - getattr(self, "prepruning_finetune_steps", 0))
             pruning_re["target_sparsity"] = target_sparsity
-            metrics.update(pruning_re)
+            renamed_pruning_re = {f"eval_{k}": v for k, v in pruning_re.items()} # renaming is crucial
+            metrics.update(renamed_pruning_re)
             
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
 
@@ -747,69 +779,7 @@ class CoFiTrainer(Trainer):
         self._memory_tracker.stop_and_update_metrics(metrics)
         
         return metrics
-
-    def save_l0_module(self):
-        if self.l0_module is not None:
-            l0_state_dict = self.l0_module.state_dict()
-                
-            if self.args.should_save:
-                torch.save(l0_state_dict, os.path.join(self.args.output_dir, "l0_module.pt"))
-                
-    def save_model(self, output_dir: Optional[str] = None, _internal_call: bool = False):
-        if output_dir is None:
-            output_dir = self.args.output_dir
-
-        if (
-            ShardedDDPOption.ZERO_DP_2 in self.args.sharded_ddp
-            or ShardedDDPOption.ZERO_DP_3 in self.args.sharded_ddp
-            or self.fsdp is not None
-        ):
-            state_dict = self.model.state_dict()
-
-            if self.args.should_save:
-                self._save(output_dir, state_dict=state_dict)
-            
-                    
-        elif self.deepspeed:
-
-            # this takes care of everything as long as we aren't under zero3
-            if self.args.should_save:
-                self._save(output_dir)
-
-            if is_deepspeed_zero3_enabled():
-                # It's too complicated to try to override different places where the weights dump gets
-                # saved, so since under zero3 the file is bogus, simply delete it. The user should
-                # either user deepspeed checkpoint to resume or to recover full weights use
-                # zero_to_fp32.py stored in the checkpoint.
-                if self.args.should_save:
-                    file = os.path.join(output_dir, WEIGHTS_NAME)
-                    if os.path.isfile(file):
-                        # print(f"deepspeed zero3: removing {file}, see zero_to_fp32.py to recover weights")
-                        os.remove(file)
-
-                # now save the real model if stage3_gather_16bit_weights_on_model_save=True
-                # if false it will not be saved.
-                # This must be called on all ranks
-                if not self.deepspeed.save_16bit_model(output_dir, WEIGHTS_NAME):
-                    logger.warning(
-                        "deepspeed.save_16bit_model didn't save the model, since"
-                        " stage3_gather_16bit_weights_on_model_save=false. Saving the full checkpoint instead, use"
-                        " zero_to_fp32.py to recover weights"
-                    )
-                    self.deepspeed.save_checkpoint(output_dir)
-                    
-        elif self.args.should_save:
-            self._save(output_dir)
-        
-        #### added ####
-        if self.args.should_save:
-            self.save_l0_module() 
-        ##############
-
-        # Push to the Hub when `save_model` is called by the user.
-        if self.args.push_to_hub and not _internal_call:
-            self.push_to_hub(commit_message="Model save")
-            
+      
     def print_metrics(self, metrics):
         print("*" * 20 + f" Eval @ {self.state.global_step} " + "*" * 20)
         for key in metrics:
@@ -1048,14 +1018,11 @@ class CoFiTrainer(Trainer):
                 lag_loss = lag_loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
-            self.scaler.scale(loss).backward()
             if lag_loss is not None:
+                self.scaler.scale(loss).backward(retain_graph=True)
                 self.scaler.scale(lag_loss).backward()
-        elif self.use_apex:
-            with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                scaled_loss.backward()
-                if lag_loss is not None:
-                    lag_loss.backward()
+            else:
+                self.scaler.scale(loss).backward()
         elif self.deepspeed:
             # loss gets scaled under gradient_accumulation_steps in deepspeed
             loss = self.deepspeed.backward(loss)
@@ -1065,7 +1032,11 @@ class CoFiTrainer(Trainer):
             loss.backward()
             if lag_loss is not None:
                 lag_loss.backward()
-
+        
+        if any([p.grad.isinf().any() or p.grad.isnan().any() for p in model.parameters()]):
+            import pdb; pdb.set_trace()
+        
+        # [n for n, p in model.named_parameters() if p.grad.isinf().any() or p.grad.isnan().any() ] 
         if lag_loss is not None:
             return loss.detach(), lag_loss.detach()
         else:
@@ -1110,17 +1081,17 @@ class CoFiTrainer(Trainer):
         zs = None; lag_loss = None
         if self.l0_module is not None:
             if stage != "fp":
-                zs = self.l0_module.forward(training=True)
+                zs = model.l0_module.forward(training=True)
             if stage == "lw" or stage == "jt":
-                lag_loss, expcted_sparsity, target_sparsity = self.l0_module.lagrangian_regularization(self.state.global_step - self.prepruning_finetune_steps)
+                lag_loss, expcted_sparsity, target_sparsity = model.l0_module.lagrangian_regularization(self.state.global_step - self.prepruning_finetune_steps)
             if stage == "ff" or stage == "eval":
-                zs = self.l0_module.forward(training=False)
+                zs = model.l0_module.forward(training=False)
                 
         if zs is not None:
             zs = self._prepare_inputs(zs)
             inputs.update(zs)
         outputs = model(**inputs)
-
+        
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
@@ -1144,3 +1115,72 @@ class CoFiTrainer(Trainer):
             return (loss, outputs) if return_outputs else loss
         
         return (loss, lag_loss, outputs) if return_outputs else (loss, lag_loss)
+
+    def _get_learning_rate(self, lr_scheduler):
+        if lr_scheduler is None:
+            return None
+
+        if self.deepspeed:
+            # with deepspeed's fp16 and dynamic loss scale enabled the optimizer/scheduler steps may
+            # not run for the first few dozen steps while loss scale is too large, and thus during
+            # that time `get_last_lr` will fail if called during that warm up stage, so work around it:
+            try:
+                last_lr = lr_scheduler.get_last_lr()[0]
+            except AssertionError as e:
+                if "need to call step" in str(e):
+                    logger.warning("tried to get lr value before scheduler/optimizer started stepping, returning lr=0")
+                    last_lr = 0
+                else:
+                    raise
+        else:
+            last_lr = lr_scheduler.get_last_lr()[0]
+            if torch.is_tensor(last_lr):
+                last_lr = last_lr.item()
+        return last_lr
+
+    def _maybe_log_save_evaluate(self, tr_loss, lag_tr_loss, model, trial, epoch, ignore_keys_for_eval):
+        if self.control.should_log:
+            if is_torch_tpu_available():
+                xm.mark_step()
+
+            logs: Dict[str, float] = {}
+
+            # all_gather + mean() to get average loss over all processes
+            tr_loss_scalar = self._nested_gather(tr_loss).mean().item()
+            lag_tr_loss_scalar = self._nested_gather(lag_tr_loss).mean().item() if lag_tr_loss is not None else 0.0
+
+            # reset tr_loss to zero
+            tr_loss -= tr_loss
+
+            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            logs["lag_loss"] = round(lag_tr_loss_scalar / self.state.global_step - self._globalstep_last_logged, 4)
+            logs["learning_rate"] = self._get_learning_rate(self.lr_scheduler)
+            if model.l0_module is not None:
+                logs["lambda_1"] = model.l0_module.lambda_1.item()
+                logs["lambda_2"] = model.l0_module.lambda_2.item()
+            if self.l0_optimizer is not None:
+                logs["l0_learning_rate"] = self._get_learning_rate(self.l0_lr_scheduler)
+                logs["lag_learning_rate"] = self._get_learning_rate(self.lag_lr_scheduler)
+
+            self._total_loss_scalar += tr_loss_scalar
+            self._globalstep_last_logged = self.state.global_step
+            self.store_flos()
+
+            self.log(logs)
+
+        metrics = None
+        if self.control.should_evaluate:
+            if isinstance(self.eval_dataset, dict):
+                for eval_dataset_name, eval_dataset in self.eval_dataset.items():
+                    metrics = self.evaluate(
+                        eval_dataset=eval_dataset,
+                        ignore_keys=ignore_keys_for_eval,
+                        metric_key_prefix=f"eval_{eval_dataset_name}",
+                    )
+            else:
+                metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
+            self._report_to_hp_search(trial, self.state.global_step, metrics)
+
+        if self.control.should_save:
+            self._save_checkpoint(model, trial, metrics=metrics)
+            self.control = self.callback_handler.on_save(self.args, self.state, self.control)

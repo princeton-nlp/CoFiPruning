@@ -56,6 +56,9 @@ class AdditionalArguments:
     preprocessed_train_files: List[str] = field(default_factory=list)
     preprocessed_validation_files: List[str] = field(default_factory=list)
     training_data_strategy: str = field(default="merge", metadata={"help": "Strategy when having multiple training datasets. e.g., merge, split"})
+
+    # scheduler
+    l0_lr_scheduler_type: Optional[str] = field(default="linear", metadata={"help": "Type of scheduler for l0 learning rate."})
     
 
 if __name__ == "__main__":

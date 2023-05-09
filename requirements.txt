@@ -1,6 +1,6 @@
-transformers
+transformers==4.17.0.dev
 scipy==1.7.3
-datasets
+datasets==1.14.0
 scikit-learn==1.0.2
 torch==1.10.2
 black
